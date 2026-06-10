@@ -77,7 +77,7 @@ export class Simulation {
 
       if (t === Cell.WATER && openAbove) {
         // Evaporation from exposed water.
-        this.humidity = Math.min(100, this.humidity + 0.05);
+        this.humidity = Math.min(100, this.humidity + 0.022);
         if (Math.random() < 0.0012) {
           type[i] = Cell.EMPTY;
           g.shade[i] = 0;
@@ -107,8 +107,9 @@ export class Simulation {
       }
     }
 
-    // The lid leaks a little.
-    this.humidity = Math.max(0, this.humidity - 0.004);
+    // The lid leaks a little — keeps a big pond's equilibrium around 65-75%
+    // instead of pinning the gauge at 100.
+    this.humidity = Math.max(0, this.humidity - 0.012);
 
     // Condensation: humid air fogs the glass and trickles down the walls,
     // re-wetting the soil near the edges.
@@ -334,6 +335,31 @@ export class Simulation {
         this.move(x, y, z, i, nx, y, nz);
         return true;
       }
+    }
+    // Lonely droplets: a stranded single cell of water in a dip soaks into
+    // the ground or evaporates instead of sitting around like a blue pebble.
+    // Crucially, lonely cells never settle — they stay awake until gone.
+    const hasWaterNeighbor =
+      g.get(x + 1, y, z) === Cell.WATER || g.get(x - 1, y, z) === Cell.WATER ||
+      g.get(x, y, z + 1) === Cell.WATER || g.get(x, y, z - 1) === Cell.WATER ||
+      g.get(x, y + 1, z) === Cell.WATER || (y > 0 && g.get(x, y - 1, z) === Cell.WATER);
+    if (!hasWaterNeighbor) {
+      if (Math.random() < 0.06) {
+        if (y > 0) {
+          const bi = g.idx(x, y - 1, z);
+          const bt = g.type[bi] as Cell;
+          if (bt === Cell.SOIL || bt === Cell.SAND) {
+            g.wet[bi] = Math.min(255, g.wet[bi] + 100);
+          }
+        }
+        this.humidity = Math.min(100, this.humidity + 0.05);
+        g.type[i] = Cell.EMPTY;
+        g.shade[i] = 0;
+        g.flags[i] = 0;
+        g.wake(x, y, z);
+        this.changed = true;
+      }
+      return true;
     }
     if (Math.random() < 0.5) this.grid.flags[i] |= F_SETTLED;
     return false;
