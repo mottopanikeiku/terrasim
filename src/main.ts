@@ -1,146 +1,148 @@
-import { TerrariumScene } from './core/Scene';
-import { VoxelEngine } from './core/VoxelEngine';
-import { InputManager } from './core/InputManager';
-import { StateManager } from './core/StateManager';
-import { Vessel } from './terrarium/Vessel';
-import { Lighting } from './environment/Lighting';
-import { ParticleSystem } from './environment/Particles';
-import { AudioManager } from './environment/AudioManager';
-import { Toolbar } from './ui/Toolbar';
-import { ControlPanel } from './ui/ControlPanel';
-import { ScreenshotExport } from './ui/ScreenshotExport';
-import { buildDefaultTerrarium } from './terrarium/DefaultTerrarium';
-import { lerp } from './utils/MathUtils';
+import { SceneManager } from './core/Scene';
+import { Grid } from './core/Grid';
+import { Simulation } from './core/Simulation';
+import { VoxelRenderer } from './core/VoxelRenderer';
+import { Input } from './core/Input';
+import { Aquarium } from './world/Aquarium';
+import { Room } from './world/Room';
+import { Critters } from './world/Critters';
+import { Condensation } from './world/Condensation';
+import { PlantRenderer } from './world/PlantRenderer';
+import { buildDefaultScene } from './world/DefaultScene';
+import { UI } from './ui/UI';
+import { save, load, clearSave } from './core/Storage';
 
-async function init() {
+const SIM_HZ = 30;
+
+function init(): void {
   const app = document.getElementById('app')!;
 
-  // 1. Scene
-  const terrariumScene = new TerrariumScene(app);
+  const sceneMgr = new SceneManager(app);
+  new Aquarium(sceneMgr.scene);
+  new Room(sceneMgr.scene);
 
-  // 2. Vessel
-  const vessel = new Vessel(terrariumScene.scene);
+  const grid = new Grid();
+  const sim = new Simulation(grid);
+  const voxels = new VoxelRenderer(sceneMgr.scene, grid);
+  const plantRenderer = new PlantRenderer(sceneMgr.scene, sim);
+  const critters = new Critters(sceneMgr.scene, grid, sim);
+  const condensation = new Condensation(sceneMgr.scene);
 
-  // 3. Lighting
-  const lighting = new Lighting(terrariumScene.scene);
-  lighting.setOnTransitionUpdate((preset, t) => {
-    terrariumScene.bloomPass.strength = lerp(
-      terrariumScene.bloomPass.strength,
-      preset.bloomStrength,
-      t
-    );
-    terrariumScene.renderer.toneMappingExposure = lerp(
-      terrariumScene.renderer.toneMappingExposure,
-      preset.exposure,
-      t
-    );
+  if (!load(grid, sim)) {
+    buildDefaultScene(grid, sim);
+  }
+  sim.events.length = 0; // don't toast the pre-roll
+
+  const input = new Input(sceneMgr.renderer.domElement, sceneMgr.camera, grid, sim, sceneMgr.scene);
+
+  // Debug handle for development tooling.
+  (window as any).__terra = { grid, sim, sceneMgr, critters, plantRenderer, voxels };
+
+  const ui = new UI();
+  let speed = 1;
+  ui.onTool = (tool) => input.setTool(tool);
+  ui.onPreset = (preset) => sceneMgr.setPreset(preset);
+  ui.onSpeed = (mult) => { speed = mult; };
+  ui.onPhoto = () => {
+    sceneMgr.renderer.render(sceneMgr.scene, sceneMgr.camera);
+    const a = document.createElement('a');
+    a.href = sceneMgr.renderer.domElement.toDataURL('image/png');
+    a.download = 'terrarium.png';
+    a.click();
+    ui.hint('Photo saved');
+  };
+  ui.onReset = () => {
+    clearSave();
+    sim.getPlants().length = 0;
+    plantRenderer.clear();
+    buildDefaultScene(grid, sim);
+    sim.events.length = 0;
+    dirty = true;
+  };
+  input.onHint = (text) => ui.hint(text);
+
+  let dirty = false;
+  input.onAction = () => {
+    dirty = true;
+  };
+
+  // Main loop: fixed-rate simulation (scaled by time speed), render every frame.
+  let last = performance.now();
+  let simAccum = 0;
+  let saveAccum = 0;
+  let statsAccum = 0;
+  let time = 0;
+
+  function frame(now: number): void {
+    requestAnimationFrame(frame);
+    const rawDt = Math.min((now - last) / 1000, 0.1);
+    last = now;
+    const dt = rawDt * speed;
+    time += rawDt;
+
+    simAccum += dt;
+    const step = 1 / SIM_HZ;
+    let ticks = 0;
+    while (simAccum >= step && ticks < 4 * speed) {
+      input.simStep();
+      sim.tick();
+      simAccum -= step;
+      ticks++;
+    }
+    sim.growth(dt);
+
+    // Drain ecosystem events into toasts.
+    while (sim.events.length > 0) ui.toast(sim.events.shift()!);
+
+    if (sim.changed) {
+      voxels.rebuild();
+      sim.changed = false;
+      dirty = true;
+    }
+
+    plantRenderer.update(rawDt, time);
+    critters.update(rawDt, time, sceneMgr.currentPreset === 'night');
+    condensation.update(rawDt, sim.humidity);
+    sceneMgr.update(rawDt);
+
+    statsAccum += rawDt;
+    if (statsAccum > 1) {
+      ui.updateStats(sim.stats());
+      statsAccum = 0;
+    }
+
+    saveAccum += rawDt;
+    if (dirty && saveAccum > 8) {
+      save(grid, sim);
+      dirty = false;
+      saveAccum = 0;
+    }
+  }
+  requestAnimationFrame(frame);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && dirty) {
+      save(grid, sim);
+      dirty = false;
+    }
   });
 
-  // 4. Voxel Engine
-  const engine = new VoxelEngine(terrariumScene.scene);
-
-  // 5. Particles
-  const particles = new ParticleSystem(terrariumScene.scene);
-
-  // 6. Audio
-  const audio = new AudioManager();
-  audio.init();
-
-  // 7. State Manager
-  const stateManager = new StateManager(engine);
-  stateManager.bindKeys();
-
-  // 8. Load saved state or build default terrarium
-  if (!stateManager.load()) {
-    buildDefaultTerrarium(engine);
-  }
-
-  // 9. Input Manager
-  const input = new InputManager(
-    terrariumScene.camera,
-    engine,
-    terrariumScene.scene,
-    terrariumScene.getCanvas()
-  );
-  input.onPlacement = () => {
-    stateManager.pushUndo();
-    stateManager.save();
-  };
-
-  // 10. UI
-  ControlPanel.createTitleBar();
-
-  const toolbar = new Toolbar();
-  toolbar.onToolChange = (tool) => {
-    input.currentTool = tool;
-  };
-  toolbar.onHover = (over) => {
-    input.setOverUI(over);
-  };
-
-  const controlPanel = new ControlPanel();
-  controlPanel.onPresetChange = (name) => {
-    lighting.switchPreset(name);
-    audio.setPreset(name);
-
-    // Fireflies only in moonlight
-    particles.showFireflies = name === 'moonlight';
-  };
-  controlPanel.onScreenshot = () => {
-    ScreenshotExport.capture(terrariumScene.renderer, terrariumScene.scene, terrariumScene.camera);
-  };
-  controlPanel.onAudioToggle = () => {
-    audio.toggle();
-  };
-  controlPanel.onAutoRotate = (enabled) => {
-    terrariumScene.controls.autoRotate = enabled;
-  };
-
-  // 11. Fade out loading screen
-  setTimeout(() => {
-    const loading = document.getElementById('loading');
-    if (loading) {
-      loading.classList.add('fade-out');
-      setTimeout(() => loading.remove(), 800);
-    }
-  }, 500);
-
-  // 12. Render loop
-  let lastTime = 0;
-
-  function animate(currentTime: number) {
-    requestAnimationFrame(animate);
-
-    const time = currentTime * 0.001;
-    const delta = Math.min(time - lastTime, 0.05);
-    lastTime = time;
-
-    // Update systems
-    vessel.update(time);
-    lighting.update(delta);
-    particles.update(time, delta);
-
-    // Render
-    terrariumScene.render();
-  }
-
-  requestAnimationFrame(animate);
-
-  // 13. Visibility API — pause when tab hidden
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      terrariumScene.clock.stop();
-    } else {
-      terrariumScene.clock.start();
-    }
+  // Fade the loading overlay once the first frame is up.
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      const loading = document.getElementById('loading');
+      if (loading) {
+        loading.classList.add('fade-out');
+        setTimeout(() => loading.remove(), 700);
+      }
+    }, 250);
   });
 }
 
-init().catch((err) => {
-  console.error('Terrarium init failed:', err);
-  const loading = document.getElementById('loading');
-  if (loading) {
-    const p = loading.querySelector('p');
-    if (p) p.textContent = 'WebGL required. Please use a modern browser.';
-  }
-});
+try {
+  init();
+} catch (err) {
+  console.error('init failed', err);
+  const p = document.querySelector('#loading p');
+  if (p) p.textContent = 'WebGL is required — please use a modern browser.';
+}

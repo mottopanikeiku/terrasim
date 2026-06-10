@@ -3,57 +3,162 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-    <meta name="description" content="A beautiful interactive voxel terrarium builder. Design your own miniature ecosystem." />
-    <meta property="og:title" content="Voxel Terrarium" />
-    <meta property="og:description" content="Design, grow, and share your own beautiful voxel terrarium." />
-    <meta property="og:type" content="website" />
+    <meta name="description" content="A realistic terrarium sandbox — pour soil, water and sand into a glass aquarium, plant ferns and moss, and watch it grow." />
+    <meta property="og:title" content="Terrarium" />
+    <meta property="og:description" content="Pour, plant, grow — a realistic terrarium sandbox in your browser." />
     <title>Terrarium</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,700;1,9..144,300&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
     <style>
       *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
       html, body { width: 100%; height: 100%; overflow: hidden; }
       body {
         font-family: 'DM Sans', sans-serif;
-        background: #1a1510;
-        color: #e8e0d4;
+        background: #2b241b;
+        color: #f0e9dc;
+        -webkit-user-select: none;
+        user-select: none;
       }
-      #app {
-        width: 100%;
-        height: 100%;
-        position: relative;
-      }
-      canvas {
-        display: block;
-        width: 100%;
-        height: 100%;
-      }
-      #loading {
-        position: fixed;
+      #app { width: 100%; height: 100%; position: relative; }
+      canvas { display: block; }
+
+      /* soft photographic vignette, done in CSS so the GPU stays free */
+      #app::after {
+        content: '';
+        position: absolute;
         inset: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        background: #1a1510;
-        z-index: 1000;
-        transition: opacity 0.8s ease;
+        pointer-events: none;
+        background: radial-gradient(ellipse at 50% 42%, transparent 58%, rgba(20, 14, 8, 0.38) 100%);
+      }
+
+      #loading {
+        position: fixed; inset: 0; z-index: 100;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background: #2b241b;
+        transition: opacity 0.7s ease;
       }
       #loading.fade-out { opacity: 0; pointer-events: none; }
-      #loading h1 {
-        font-family: 'Fraunces', serif;
-        font-weight: 300;
-        font-size: 2.5rem;
-        letter-spacing: 0.05em;
-        color: #c4b89a;
-        margin-bottom: 1rem;
+      #loading h1 { font-family: 'Fraunces', serif; font-weight: 300; font-size: 2.4rem; color: #d9c9a8; }
+      #loading p { margin-top: 0.8rem; font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: #97876d; }
+
+      #brand {
+        position: fixed; top: 18px; left: 22px; z-index: 10; pointer-events: none;
       }
-      #loading p {
-        font-size: 0.9rem;
-        color: #8a7e6b;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
+      #brand h1 { font-family: 'Fraunces', serif; font-weight: 500; font-size: 1.5rem; color: #f3e8d2; text-shadow: 0 1px 8px rgba(0,0,0,0.35); }
+      #brand span { font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(243, 232, 210, 0.65); }
+
+      #stats {
+        position: fixed; top: 74px; left: 22px; z-index: 10;
+        display: flex; gap: 12px;
+        padding: 7px 14px;
+        background: rgba(28, 22, 14, 0.55);
+        border: 1px solid rgba(255, 245, 220, 0.12);
+        border-radius: 999px;
+        backdrop-filter: blur(12px);
+        font-size: 0.82rem;
+        cursor: default;
+      }
+      #stats span { display: inline-flex; align-items: center; gap: 2px; }
+
+      #toast {
+        position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-8px);
+        z-index: 11;
+        padding: 9px 18px;
+        background: rgba(38, 30, 18, 0.78);
+        border: 1px solid rgba(255, 225, 160, 0.22);
+        border-radius: 999px;
+        font-size: 0.85rem; color: #f5ecd8;
+        backdrop-filter: blur(10px);
+        opacity: 0; transition: opacity 0.4s, transform 0.4s;
+        pointer-events: none;
+        white-space: nowrap;
+      }
+      #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+      .chip.wide { width: auto; padding: 0 12px; font-size: 0.9rem; font-weight: 600; }
+
+      #topbar {
+        position: fixed; top: 18px; right: 18px; z-index: 10;
+        display: flex; gap: 10px;
+      }
+      .seg {
+        display: flex; gap: 4px; padding: 5px;
+        background: rgba(28, 22, 14, 0.55);
+        border: 1px solid rgba(255, 245, 220, 0.12);
+        border-radius: 14px;
+        backdrop-filter: blur(12px);
+      }
+      .chip {
+        width: 40px; height: 40px;
+        border: none; border-radius: 10px;
+        background: transparent;
+        color: #f0e9dc; font-size: 1.15rem;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .chip:hover { background: rgba(255, 245, 220, 0.12); }
+      .chip.active { background: rgba(255, 215, 140, 0.22); }
+
+      #toolbar {
+        position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+        z-index: 10;
+        display: flex; gap: 14px; align-items: flex-end;
+        padding: 10px 14px;
+        background: rgba(28, 22, 14, 0.55);
+        border: 1px solid rgba(255, 245, 220, 0.12);
+        border-radius: 18px;
+        backdrop-filter: blur(12px);
+        max-width: calc(100vw - 24px);
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      #toolbar::-webkit-scrollbar { display: none; }
+      .group-title {
+        font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase;
+        color: rgba(240, 233, 220, 0.5);
+        margin: 0 0 6px 4px; height: 0.8em;
+      }
+      .row { display: flex; gap: 4px; }
+      .tool {
+        display: flex; flex-direction: column; align-items: center; gap: 3px;
+        min-width: 54px; padding: 7px 6px 5px;
+        border: none; border-radius: 12px;
+        background: transparent; color: #f0e9dc;
+        cursor: pointer;
+        transition: background 0.15s, transform 0.1s;
+      }
+      .tool:hover { background: rgba(255, 245, 220, 0.1); }
+      .tool.active { background: rgba(255, 215, 140, 0.22); }
+      .tool:active { transform: scale(0.96); }
+      .tool .emoji { font-size: 1.25rem; line-height: 1.3rem; }
+      .tool .swatch {
+        width: 20px; height: 20px; border-radius: 50%;
+        margin: 0.05rem 0;
+        border: 2px solid rgba(255, 255, 255, 0.35);
+        box-shadow: inset 0 -3px 5px rgba(0,0,0,0.25);
+      }
+      .tool label { font-size: 0.66rem; color: rgba(240, 233, 220, 0.85); pointer-events: none; }
+
+      #hint {
+        position: fixed; bottom: 112px; left: 50%; transform: translateX(-50%);
+        z-index: 9;
+        padding: 8px 16px;
+        background: rgba(28, 22, 14, 0.65);
+        border: 1px solid rgba(255, 245, 220, 0.1);
+        border-radius: 999px;
+        font-size: 0.8rem; color: rgba(240, 233, 220, 0.9);
+        backdrop-filter: blur(8px);
+        opacity: 0; transition: opacity 0.3s;
+        pointer-events: none;
+        white-space: nowrap;
+      }
+      #hint.show { opacity: 1; }
+
+      @media (max-width: 760px) {
+        .tool { min-width: 46px; }
+        .tool label { font-size: 0.6rem; }
+        #brand span { display: none; }
       }
     </style>
   </head>
@@ -61,7 +166,7 @@
     <div id="app">
       <div id="loading">
         <h1>Terrarium</h1>
-        <p>Growing your garden...</p>
+        <p>Preparing the glass&hellip;</p>
       </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
