@@ -27,10 +27,10 @@ const drawButterfly: Draw = (ctx, w, h) => {
     ctx.ellipse(cx + dx, cy + dy, rx, ry, dx > 0 ? -0.5 : 0.5, 0, Math.PI * 2);
     ctx.fill();
   };
-  wing(-34, -22, 30, 38, '#e89bb6');
-  wing(34, -22, 30, 38, '#e89bb6');
-  wing(-26, 28, 22, 26, '#f2bccb');
-  wing(26, 28, 22, 26, '#f2bccb');
+  wing(-34, -22, 30, 38, '#dd7da2');
+  wing(34, -22, 30, 38, '#dd7da2');
+  wing(-26, 28, 22, 26, '#eaa3bc');
+  wing(26, 28, 22, 26, '#eaa3bc');
   // wing dots
   ctx.fillStyle = '#fdf3f6';
   for (const [dx, dy] of [[-36, -26], [36, -26], [-26, 26], [26, 26]] as const) {
@@ -183,8 +183,8 @@ export class Room {
     );
     mat.position.z = 0.085;
     const art = new THREE.Mesh(
-      new THREE.PlaneGeometry(w * 0.68, h * 0.68),
-      new THREE.MeshStandardMaterial({ map: canvasTexture(192, Math.round(192 * h / w), draw), roughness: 0.9 })
+      new THREE.PlaneGeometry(w * 0.82, h * 0.82),
+      new THREE.MeshStandardMaterial({ map: canvasTexture(256, Math.round(256 * h / w), draw), roughness: 0.9 })
     );
     art.position.z = 0.095;
     group.add(frame, mat, art);
@@ -215,7 +215,8 @@ export class Room {
   }
 
   private bookStack(scene: THREE.Scene, x: number, y: number, z: number): void {
-    const colors = [0xa8584e, 0x5f7d5a, 0xc9a35a];
+    // Muted spines — library tones, not candy.
+    const colors = [0x84443c, 0x49604a, 0x9a7c42];
     const group = new THREE.Group();
     let h = 0;
     for (let i = 0; i < 3; i++) {
