@@ -1,5 +1,6 @@
 import { ToolId } from '../core/Input';
 import { PresetName } from '../core/Scene';
+import { JournalEntry } from '../core/Journal';
 
 interface ToolDef {
   id: ToolId;
@@ -43,6 +44,7 @@ export class UI {
   onPhoto?: () => void;
   onReset?: () => void;
   onSpeed?: (mult: number) => void;
+  onJournal?: () => void;
 
   private hintEl: HTMLElement;
   private toastEl: HTMLElement;
@@ -178,6 +180,13 @@ export class UI {
     guide.addEventListener('click', () => this.guideEl.classList.toggle('open'));
     actions.appendChild(guide);
 
+    const journal = document.createElement('button');
+    journal.className = 'chip';
+    journal.title = "Your terrarium's journal";
+    journal.textContent = '\u{1F4D4}';
+    journal.addEventListener('click', () => this.onJournal?.());
+    actions.appendChild(journal);
+
     const photo = document.createElement('button');
     photo.className = 'chip';
     photo.title = 'Save a photo';
@@ -240,9 +249,10 @@ export class UI {
     }, 3800);
   }
 
-  updateStats(s: Stats): void {
+  updateStats(s: Stats, day = 1): void {
     const mood = s.plants === 0 ? '\u{1FAB9}' : s.healthyFrac > 0.8 ? '\u{1F331}' : s.healthyFrac > 0.4 ? '\u{1F614}' : '\u{1F940}';
     this.statsEl.innerHTML =
+      `<span title="How long this terrarium has been alive">\u{1F4C5} Day ${day}</span>` +
       `<span title="Air humidity — high humidity fogs the glass and waters the edges">\u{1F4A7} ${Math.round(s.humidity)}%</span>` +
       `<span title="Standing water">\u{1F30A} ${s.water}</span>` +
       `<span title="Living plants">\u{1F33F} ${s.plants}</span>` +
@@ -255,12 +265,70 @@ export class UI {
       .join('');
   }
 
+  // Generic frosted overlay card; clicking the backdrop or × closes it.
+  private buildOverlay(html: string): HTMLElement {
+    const el = document.createElement('div');
+    el.className = 'overlay';
+    el.innerHTML = `
+      <div class="overlay-card">
+        <button class="overlay-close" title="Close">&times;</button>
+        ${html}
+      </div>`;
+    document.body.appendChild(el);
+    el.querySelector('.overlay-close')!.addEventListener('click', () => el.classList.remove('open'));
+    el.addEventListener('click', (e) => {
+      if (e.target === el) el.classList.remove('open');
+    });
+    return el;
+  }
+
+  // "While you were away" card shown on return visits.
+  showWelcome(day: number, awayText: string, lines: string[], needsWater: boolean): void {
+    const items = lines.map((l) => `<li>${l}</li>`).join('');
+    const nudge = needsWater
+      ? `<p><b>Some plants came back thirsty</b> — give them a drink \u{1F4A7}</p>`
+      : '';
+    const el = this.buildOverlay(`
+      <h2>\u{1F33F} Welcome back</h2>
+      <p class="sub">Day ${day} &middot; you were away ${awayText}</p>
+      <p>Your terrarium kept living without you:</p>
+      <ul class="away">${items}</ul>
+      ${nudge}
+    `);
+    el.classList.add('open');
+  }
+
+  // The tank's diary, newest first.
+  showJournal(entries: JournalEntry[], bornAt: number, day: number): void {
+    if (this.journalEl) this.journalEl.remove();
+    const fmtWhen = (at: number) => {
+      const d = Math.floor((at - bornAt) / 86400000) + 1;
+      const t = new Date(at);
+      const hh = `${t.getHours()}`.padStart(2, '0');
+      const mm = `${t.getMinutes()}`.padStart(2, '0');
+      return `Day ${d} \u{B7} ${hh}:${mm}`;
+    };
+    const rows = entries
+      .slice()
+      .reverse()
+      .map((e) => `<div class="journal-entry"><span class="when">${fmtWhen(e.at)}</span><span>${e.msg}</span></div>`)
+      .join('');
+    this.journalEl = this.buildOverlay(`
+      <h2>\u{1F4D4} Journal</h2>
+      <p class="sub">Day ${day} &middot; everything your terrarium has lived through</p>
+      ${rows || '<p>Nothing yet — the story starts now \u{1F331}</p>'}
+    `);
+    this.journalEl.classList.add('open');
+  }
+
+  private journalEl?: HTMLElement;
+
   private buildGuide(): void {
     this.guideEl = document.createElement('div');
-    this.guideEl.id = 'guide';
+    this.guideEl.className = 'overlay';
     this.guideEl.innerHTML = `
-      <div id="guide-card">
-        <button id="guide-close" title="Close">&times;</button>
+      <div class="overlay-card">
+        <button class="overlay-close" title="Close">&times;</button>
         <h2>\u{1F331} How your terrarium works</h2>
         <p>A terrarium is a tiny world behind glass. Done right, it needs
         almost nothing from you — the same water cycles around and around,
@@ -318,7 +386,7 @@ export class UI {
       </div>
     `;
     document.body.appendChild(this.guideEl);
-    this.guideEl.querySelector('#guide-close')!.addEventListener('click', () => {
+    this.guideEl.querySelector('.overlay-close')!.addEventListener('click', () => {
       this.guideEl.classList.remove('open');
     });
     this.guideEl.addEventListener('click', (e) => {
