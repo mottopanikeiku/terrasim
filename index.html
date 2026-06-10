@@ -97,15 +97,15 @@
         to { opacity: 1; transform: translateX(0); }
       }
 
-      #guide {
+      .overlay {
         position: fixed; inset: 0; z-index: 50;
         display: none;
         align-items: center; justify-content: center;
         background: rgba(16, 11, 6, 0.55);
         backdrop-filter: blur(4px);
       }
-      #guide.open { display: flex; }
-      #guide-card {
+      .overlay.open { display: flex; }
+      .overlay-card {
         position: relative;
         width: min(560px, calc(100vw - 40px));
         max-height: min(78vh, 700px);
@@ -117,20 +117,20 @@
         backdrop-filter: blur(16px);
         box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
       }
-      #guide-card h2 {
+      .overlay-card h2 {
         font-family: 'Fraunces', serif; font-weight: 500;
         font-size: 1.45rem; color: #f3e6c8; margin-bottom: 0.7rem;
       }
-      #guide-card h3 {
+      .overlay-card h3 {
         font-family: 'Fraunces', serif; font-weight: 500;
         font-size: 1.05rem; color: #e8cf9e; margin: 1.2rem 0 0.35rem;
       }
-      #guide-card p {
+      .overlay-card p {
         font-size: 0.86rem; line-height: 1.55; color: rgba(240, 230, 210, 0.88);
         margin-bottom: 0.4rem;
       }
-      #guide-card b { color: #f5e7c6; }
-      #guide-close {
+      .overlay-card b { color: #f5e7c6; }
+      .overlay-close {
         position: absolute; top: 14px; right: 16px;
         width: 34px; height: 34px;
         border: none; border-radius: 50%;
@@ -138,7 +138,28 @@
         color: #f0e0c0; font-size: 1.3rem; line-height: 1;
         cursor: pointer;
       }
-      #guide-close:hover { background: rgba(255, 235, 195, 0.22); }
+      .overlay-close:hover { background: rgba(255, 235, 195, 0.22); }
+      .overlay-card .sub {
+        font-size: 0.78rem; color: rgba(232, 207, 158, 0.75);
+        margin: -0.4rem 0 0.8rem;
+      }
+      .overlay-card ul.away {
+        list-style: none; margin: 0.4rem 0 0.8rem;
+      }
+      .overlay-card ul.away li {
+        font-size: 0.88rem; line-height: 1.7; color: rgba(240, 230, 210, 0.9);
+      }
+      .journal-entry {
+        display: flex; gap: 12px; align-items: baseline;
+        padding: 7px 0;
+        border-bottom: 1px solid rgba(255, 235, 195, 0.08);
+        font-size: 0.84rem; color: rgba(240, 230, 210, 0.88);
+      }
+      .journal-entry .when {
+        flex: 0 0 86px;
+        font-size: 0.72rem; color: rgba(232, 207, 158, 0.65);
+        white-space: nowrap;
+      }
 
       #topbar {
         position: fixed; top: 18px; right: 18px; z-index: 10;
