@@ -68,7 +68,8 @@ export class VoxelRenderer {
 
     this.fine = makeMesh(
       new THREE.BoxGeometry(V, V, V),
-      new THREE.MeshStandardMaterial({ roughness: 0.95, metalness: 0, envMapIntensity: 0.4 }),
+      // Fully matte: sheen on dirt is what makes it look like plastic.
+      new THREE.MeshStandardMaterial({ roughness: 1.0, metalness: 0, envMapIntensity: 0.22 }),
       MAX_FINE, true
     );
     // Pebbles: chunky low-poly nuggets.
@@ -176,7 +177,7 @@ export class VoxelRenderer {
           const base = PALETTE[shade[i]] ?? PALETTE[1];
           c.copy(base);
           if ((t === Cell.SOIL || t === Cell.SAND) && wet[i] >= WET_VISIBLE) {
-            c.multiplyScalar(wet[i] >= WET_SOAKED ? 0.55 : 0.7);
+            c.multiplyScalar(wet[i] >= WET_SOAKED ? 0.64 : 0.78);
           }
           const nSolid = (solidXm ? 1 : 0) + (solidXp ? 1 : 0) + (solidZm ? 1 : 0) + (solidZp ? 1 : 0) + (solidYm ? 1 : 0);
           let ao = 1 - nSolid * 0.04 - (solidYp ? 0.12 : 0);

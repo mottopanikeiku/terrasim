@@ -42,15 +42,15 @@ function state(p: {
 
 const PRESETS: Record<PresetName, LightState> = {
   day: state({
-    sunColor: 0xfff6e8, sunIntensity: 3.2, sunPos: [10, 18, 8],
-    hemiSky: 0xcfe4f5, hemiGround: 0x8a7560, hemiIntensity: 1.3,
-    bgTop: 0xe9dcc4, bgMid: 0xd2bb95, bgBot: 0xa08560,
+    sunColor: 0xfff6e8, sunIntensity: 4.0, sunPos: [10, 18, 8],
+    hemiSky: 0xcfe4f5, hemiGround: 0x8a7560, hemiIntensity: 0.9,
+    bgTop: 0xcdbb9e, bgMid: 0xb19b78, bgBot: 0x8a7355,
     exposure: 1.15, lampIntensity: 0,
   }),
   golden: state({
-    sunColor: 0xffc77d, sunIntensity: 3.4, sunPos: [14, 9, 10],
-    hemiSky: 0xe8c49a, hemiGround: 0x84684a, hemiIntensity: 1.2,
-    bgTop: 0xecd1a4, bgMid: 0xd2a468, bgBot: 0x916640,
+    sunColor: 0xffc77d, sunIntensity: 4.2, sunPos: [14, 9, 10],
+    hemiSky: 0xe8c49a, hemiGround: 0x84684a, hemiIntensity: 0.85,
+    bgTop: 0xd6b181, bgMid: 0xb38a55, bgBot: 0x7d5836,
     exposure: 1.2, lampIntensity: 0,
   }),
   night: state({
