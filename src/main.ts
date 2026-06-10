@@ -81,6 +81,7 @@ function init(): void {
   let saveAccum = 0;
   let statsAccum = 0;
   let time = 0;
+  let lastRebuild = 0;
 
   function frame(now: number): void {
     requestAnimationFrame(frame);
@@ -103,10 +104,13 @@ function init(): void {
     // Drain ecosystem events into toasts.
     while (sim.events.length > 0) ui.toast(sim.events.shift()!);
 
-    if (sim.changed) {
+    // Rebuilds are the heaviest step; cap them at ~25Hz so sustained pours
+    // keep a fluid framerate.
+    if (sim.changed && now - lastRebuild > 38) {
       voxels.rebuild();
       water.rebuild(grid);
       sim.changed = false;
+      lastRebuild = now;
       dirty = true;
     }
 

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { W, H, D, V, cellToWorld } from './constants';
+import { W, H, D, V } from './constants';
 import { Cell, Grid, WET_VISIBLE, WET_SOAKED } from './Grid';
 import { PALETTE } from './palette';
 
@@ -37,6 +37,13 @@ function cellHash(x: number, y: number, z: number): number {
   h = (h ^ (h >> 13)) >>> 0;
   return h;
 }
+
+// 1 where a cell type blocks sight of its neighbor (everything except
+// empty space and water). Indexed by Cell — branch-free occlusion tests.
+const BLOCKS = new Uint8Array(16);
+for (let t = 1; t < 16; t++) BLOCKS[t] = 1;
+BLOCKS[Cell.EMPTY] = 0;
+BLOCKS[Cell.WATER] = 0;
 
 // Renders the voxel grid as three instanced meshes: fine grains (sand/soil),
 // pebbles (gravel/rock/moss clumps), and transparent water.
@@ -101,38 +108,35 @@ export class VoxelRenderer {
     let nf = 0, np = 0, nt = 0;
     const c = this.tmpColor;
 
+    const WD = W * D;
+    const halfW = W / 2 - 0.5;
+    const halfD = D / 2 - 0.5;
     for (let y = 0; y < H; y++) {
+      const py = (y + 0.5) * V;
       for (let z = 0; z < D; z++) {
-        let i = g.idx(0, y, z);
+        let i = y * WD + z * W;
+        const pz = (z - halfD) * V;
         for (let x = 0; x < W; x++, i++) {
-          const t = type[i] as Cell;
-          if (t === Cell.EMPTY) continue;
+          const t = type[i];
+          if (t === Cell.EMPTY || t === Cell.WATER) continue;
 
-          // Out-of-bounds counts as EMPTY: those faces are visible through glass.
-          const xm = x > 0 ? type[i - 1] : Cell.EMPTY;
-          const xp = x < W - 1 ? type[i + 1] : Cell.EMPTY;
-          const zm = z > 0 ? type[i - W] : Cell.EMPTY;
-          const zp = z < D - 1 ? type[i + W] : Cell.EMPTY;
-          const ym = y > 0 ? type[i - W * D] : Cell.EMPTY;
-          const yp = y < H - 1 ? type[i + W * D] : Cell.EMPTY;
-
-          if (t === Cell.WATER) continue; // drawn by WaterSurface
-
-          const solidXm = xm !== Cell.EMPTY && xm !== Cell.WATER;
-          const solidXp = xp !== Cell.EMPTY && xp !== Cell.WATER;
-          const solidZm = zm !== Cell.EMPTY && zm !== Cell.WATER;
-          const solidZp = zp !== Cell.EMPTY && zp !== Cell.WATER;
-          const solidYm = ym !== Cell.EMPTY && ym !== Cell.WATER;
-          const solidYp = yp !== Cell.EMPTY && yp !== Cell.WATER;
-          if (solidXm && solidXp && solidZm && solidZp && solidYm && solidYp) continue;
+          // Branch-light occlusion via lookup table. Out-of-bounds counts
+          // as EMPTY: those faces are visible through the glass.
+          const bXm = x > 0 ? BLOCKS[type[i - 1]] : 0;
+          const bXp = x < W - 1 ? BLOCKS[type[i + 1]] : 0;
+          const bZm = z > 0 ? BLOCKS[type[i - W]] : 0;
+          const bZp = z < D - 1 ? BLOCKS[type[i + W]] : 0;
+          const bYm = y > 0 ? BLOCKS[type[i - WD]] : 0;
+          const bYp = y < H - 1 ? BLOCKS[type[i + WD]] : 0;
+          if (bXm & bXp & bZm & bZp & bYm & bYp) continue;
 
           const mossy = t === Cell.MOSS;
           const pebbly = t === Cell.GRAVEL || t === Cell.ROCK;
           if (mossy ? nt >= MAX_TUFT : pebbly ? np >= MAX_PEBBLE : nf >= MAX_FINE) continue;
 
-          const [px, py, pz] = cellToWorld(x, y, z);
+          const px = (x - halfW) * V;
           const jitterSet = mossy ? this.tuftJitter : pebbly ? this.pebbleJitter : this.fineJitter;
-          const j = jitterSet[cellHash(x, y, z) % jitterSet.length];
+          const j = jitterSet[cellHash(x, y, z) % 24];
           const arr = mossy ? tm : pebbly ? pm : fm;
           const n = mossy ? nt : pebbly ? np : nf;
           const b = n * 16;
@@ -149,8 +153,8 @@ export class VoxelRenderer {
           if ((t === Cell.SOIL || t === Cell.SAND) && wet[i] >= WET_VISIBLE) {
             c.multiplyScalar(wet[i] >= WET_SOAKED ? 0.64 : 0.78);
           }
-          const nSolid = (solidXm ? 1 : 0) + (solidXp ? 1 : 0) + (solidZm ? 1 : 0) + (solidZp ? 1 : 0) + (solidYm ? 1 : 0);
-          let ao = 1 - nSolid * 0.04 - (solidYp ? 0.12 : 0);
+          const nSolid = bXm + bXp + bZm + bZp + bYm;
+          let ao = 1 - nSolid * 0.04 - (bYp ? 0.12 : 0);
           if (ao < 0.55) ao = 0.55;
           c.multiplyScalar(ao);
 

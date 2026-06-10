@@ -94,35 +94,40 @@ export class WaterSurface {
     return sum / n;
   }
 
+  private waterCells = new Uint32Array(140000);
+
   rebuild(grid: Grid): void {
     const { type } = grid;
     this.quads = 0;
 
-    // Column surface heights (with a slight dip below the cell top).
+    // Phase 1: one linear pass — collect water cells and record each
+    // column's surface height (cells are y-major, so later hits are higher).
     this.surf.fill(-1);
-    for (let z = 0; z < D; z++) {
-      for (let x = 0; x < W; x++) {
-        for (let y = H - 1; y >= 0; y--) {
-          const i = grid.idx(x, y, z);
-          if (type[i] !== Cell.WATER) continue;
-          const above = y < H - 1 ? type[i + W * D] : Cell.EMPTY;
-          if (above === Cell.EMPTY) {
-            this.surf[x + z * W] = (y + 1) * V - V * 0.28;
-            break;
-          }
-        }
+    const WD = W * D;
+    const n = type.length;
+    let count = 0;
+    for (let i = 0; i < n; i++) {
+      if (type[i] !== Cell.WATER) continue;
+      if (count < this.waterCells.length) this.waterCells[count++] = i;
+      const above = i + WD < n ? type[i + WD] : Cell.EMPTY;
+      if (above === Cell.EMPTY) {
+        const y = (i / WD) | 0;
+        this.surf[i - y * WD] = (y + 1) * V - V * 0.28;
       }
     }
 
     const wx0 = -W / 2 * V;
     const wz0 = -D / 2 * V;
 
-    for (let y = 0; y < H; y++) {
-      for (let z = 0; z < D; z++) {
-        let i = grid.idx(0, y, z);
-        for (let x = 0; x < W; x++, i++) {
-          if (type[i] !== Cell.WATER) continue;
-
+    // Phase 2: emit faces for the (few) water cells only.
+    for (let k = 0; k < count; k++) {
+      const i = this.waterCells[k];
+      const y = (i / WD) | 0;
+      const rem = i - y * WD;
+      const z = (rem / W) | 0;
+      const x = rem - z * W;
+      {
+        {
           const xm = x > 0 ? type[i - 1] : Cell.EMPTY;
           const xp = x < W - 1 ? type[i + 1] : Cell.EMPTY;
           const zm = z > 0 ? type[i - W] : Cell.EMPTY;

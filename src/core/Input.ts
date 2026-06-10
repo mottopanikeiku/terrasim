@@ -12,10 +12,10 @@ export type ToolId =
   | 'erase';
 
 const POUR_RANGE: Record<string, { cell: Cell; range: RangeName; rate: number }> = {
-  sand: { cell: Cell.SAND, range: 'sand', rate: 5 },
-  soil: { cell: Cell.SOIL, range: 'soil', rate: 5 },
-  gravel: { cell: Cell.GRAVEL, range: 'gravel', rate: 3 },
-  water: { cell: Cell.WATER, range: 'water', rate: 9 },
+  sand: { cell: Cell.SAND, range: 'sand', rate: 12 },
+  soil: { cell: Cell.SOIL, range: 'soil', rate: 12 },
+  gravel: { cell: Cell.GRAVEL, range: 'gravel', rate: 7 },
+  water: { cell: Cell.WATER, range: 'water', rate: 22 },
 };
 
 export class Input {
@@ -115,13 +115,13 @@ export class Input {
         surface = Math.max(surface, this.grid.top(x, z) + 1);
       }
     }
-    const spawnY = Math.min(H - 2, surface + 5);
+    const spawnY = Math.min(H - 3, surface + 8);
 
     let spawned = false;
     for (let n = 0; n < spec.rate; n++) {
-      const x = cx + ((Math.random() * 3) | 0) - 1;
-      const y = spawnY + ((Math.random() * 3) | 0);
-      const z = cz + ((Math.random() * 3) | 0) - 1;
+      const x = cx + ((Math.random() * 4) | 0) - 2;
+      const y = spawnY + ((Math.random() * 4) | 0);
+      const z = cz + ((Math.random() * 4) | 0) - 2;
       if (!this.grid.inBounds(x, y, z) || !this.grid.isEmpty(x, y, z)) continue;
       this.grid.set(x, y, z, spec.cell, randomShade(spec.range));
       spawned = true;
@@ -186,7 +186,7 @@ export class Input {
     let planted = 0;
     for (let n = 0; n < 5; n++) {
       const ang = Math.random() * Math.PI * 2;
-      const dist = Math.random() * 6;
+      const dist = Math.random() * 9;
       const x = Math.round(cx + Math.cos(ang) * dist);
       const z = Math.round(cz + Math.sin(ang) * dist);
       if (!this.grid.inBounds(x, 1, z)) continue;
@@ -209,9 +209,9 @@ export class Input {
   }
 
   private placeRock(cx: number, cy: number, cz: number): void {
-    const rx = 1.6 + Math.random() * 1.6;
-    const ry = 1.2 + Math.random() * 1.4;
-    const rz = 1.6 + Math.random() * 1.6;
+    const rx = 2.4 + Math.random() * 2.4;
+    const ry = 1.8 + Math.random() * 2.1;
+    const rz = 2.4 + Math.random() * 2.4;
     const r = Math.ceil(Math.max(rx, rz));
     for (let dx = -r; dx <= r; dx++) {
       for (let dy = -Math.ceil(ry); dy <= Math.ceil(ry); dy++) {
@@ -235,7 +235,7 @@ export class Input {
     const pick = this.pick(true);
     if (!pick.hit) return;
     const [cx, cy, cz] = pick.hit;
-    const r = 2;
+    const r = 3;
     let removed = false;
     for (let dx = -r; dx <= r; dx++) {
       for (let dy = -r; dy <= r; dy++) {

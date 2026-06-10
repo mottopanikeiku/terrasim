@@ -1,5 +1,5 @@
 import { W, H, D } from './constants';
-import { Cell, F_SETTLED, Grid, isGranular } from './Grid';
+import { Cell, F_SETTLED, Grid } from './Grid';
 import { Plant, Species } from '../world/Plants';
 import { randomShade } from './palette';
 
@@ -14,14 +14,13 @@ import { randomShade } from './palette';
 //   rocks, and retreats when the tank dries out
 
 const MAX_PLANTS = 60;
-const MAX_MOSS = 1600;
+const MAX_MOSS = 3600;
 
 export class Simulation {
   changed = true; // renderer should rebuild
   humidity = 50;  // 0..100, air moisture inside the tank
   events: string[] = []; // notable happenings, drained by the UI
 
-  private flip = false;
   private plants: Plant[] = [];
   private nextPlantId = 1;
   private growthTimer = 0;
@@ -35,27 +34,29 @@ export class Simulation {
   tick(): void {
     const g = this.grid;
     const { type, flags } = g;
-    this.flip = !this.flip;
     let moved = false;
 
-    for (let y = 0; y < H; y++) {
-      for (let zi = 0; zi < D; zi++) {
-        const z = this.flip ? D - 1 - zi : zi;
-        for (let xi = 0; xi < W; xi++) {
-          const x = this.flip ? W - 1 - xi : xi;
-          const i = g.idx(x, y, z);
-          const t = type[i] as Cell;
-          if (t === Cell.EMPTY) continue;
-          if (flags[i] & F_SETTLED) continue;
+    // Hot path: one linear pass. The array layout is y-major ascending, so
+    // linear order IS bottom-up; coordinates are decoded only for the few
+    // active cells. Direction bias is handled by per-grain shuffled dirs.
+    const n = type.length;
+    const WD = W * D;
+    for (let i = 0; i < n; i++) {
+      const t = type[i];
+      if (t === Cell.EMPTY) continue;
+      if (flags[i] & F_SETTLED) continue;
 
-          if (isGranular(t)) {
-            moved = this.stepGranular(x, y, z, i) || moved;
-          } else if (t === Cell.WATER) {
-            moved = this.stepWater(x, y, z, i) || moved;
-          } else {
-            flags[i] |= F_SETTLED; // static types never move
-          }
-        }
+      const y = (i / WD) | 0;
+      const rem = i - y * WD;
+      const z = (rem / W) | 0;
+      const x = rem - z * W;
+
+      if (t === Cell.SAND || t === Cell.SOIL || t === Cell.GRAVEL) {
+        moved = this.stepGranular(x, y, z, i) || moved;
+      } else if (t === Cell.WATER) {
+        moved = this.stepWater(x, y, z, i) || moved;
+      } else {
+        flags[i] |= F_SETTLED; // static types never move
       }
     }
 
@@ -69,7 +70,7 @@ export class Simulation {
     const { type, wet } = g;
     const n = type.length;
 
-    for (let s = 0; s < 140; s++) {
+    for (let s = 0; s < 320; s++) {
       const i = (Math.random() * n) | 0;
       const t = type[i] as Cell;
       const above = i + W * D;
@@ -148,16 +149,16 @@ export class Simulation {
       this.changed = true;
       return;
     }
-    if (!damp || Math.random() > 0.08) return;
+    if (!damp || Math.random() > 0.14) return;
     if (this.mossCells() >= MAX_MOSS) return;
 
-    // Creep to a neighboring surface within one step up/down.
+    // Creep to a neighboring surface within a small step up/down.
     const dx = Math.random() < 0.5 ? 1 : -1;
     const dz = Math.random() < 0.5 ? 1 : -1;
     const nx = Math.random() < 0.5 ? x + dx : x;
     const nz = nx === x ? z + dz : z;
     if (nx < 0 || nx >= W || nz < 0 || nz >= D) return;
-    for (let ny = Math.min(H - 2, y + 1); ny >= Math.max(1, y - 2); ny--) {
+    for (let ny = Math.min(H - 2, y + 2); ny >= Math.max(1, y - 3); ny--) {
       const ti = g.idx(nx, ny, nz);
       const bi = ti - W * D;
       const bt = g.type[bi] as Cell;
@@ -183,9 +184,9 @@ export class Simulation {
   paintMoss(cx: number, cz: number): boolean {
     const g = this.grid;
     let added = 0;
-    for (let n = 0; n < 14; n++) {
-      const x = cx + Math.round((Math.random() - 0.5) * 5);
-      const z = cz + Math.round((Math.random() - 0.5) * 5);
+    for (let n = 0; n < 26; n++) {
+      const x = cx + Math.round((Math.random() - 0.5) * 8);
+      const z = cz + Math.round((Math.random() - 0.5) * 8);
       if (x < 0 || x >= W || z < 0 || z >= D) continue;
       const top = g.top(x, z);
       if (top < 0 || top >= H - 2) continue;
@@ -257,7 +258,12 @@ export class Simulation {
     }
     const belowT = g.get(x, y - 1, z);
     if (belowT === Cell.EMPTY) {
-      this.move(x, y, z, i, x, y - 1, z);
+      // Free fall covers two cells per tick so fine grains still drop briskly.
+      if (y > 1 && g.get(x, y - 2, z) === Cell.EMPTY) {
+        this.move(x, y, z, i, x, y - 2, z);
+      } else {
+        this.move(x, y, z, i, x, y - 1, z);
+      }
       return true;
     }
     if (belowT === Cell.WATER) {
@@ -308,7 +314,11 @@ export class Simulation {
         return true;
       }
       if (bt === Cell.EMPTY) {
-        this.move(x, y, z, i, x, y - 1, z);
+        if (y > 1 && g.get(x, y - 2, z) === Cell.EMPTY) {
+          this.move(x, y, z, i, x, y - 2, z);
+        } else {
+          this.move(x, y, z, i, x, y - 1, z);
+        }
         return true;
       }
     }
@@ -472,9 +482,9 @@ export class Simulation {
   private drink(plant: Plant): boolean {
     const g = this.grid;
     let bestI = -1, bestWet = 0;
-    for (let dy = -3; dy <= 0; dy++) {
-      for (let dz = -2; dz <= 2; dz++) {
-        for (let dx = -2; dx <= 2; dx++) {
+    for (let dy = -4; dy <= 0; dy++) {
+      for (let dz = -3; dz <= 3; dz++) {
+        for (let dx = -3; dx <= 3; dx++) {
           const x = plant.x + dx, y = plant.y + dy, z = plant.z + dz;
           if (!g.inBounds(x, y, z)) continue;
           const i = g.idx(x, y, z);
@@ -541,10 +551,10 @@ export class Simulation {
     if (Math.random() > chance[plant.species]) return;
     const g = this.grid;
     const ang = Math.random() * Math.PI * 2;
-    const dist = 5 + Math.random() * 8;
+    const dist = 8 + Math.random() * 12;
     const x = Math.round(plant.x + Math.cos(ang) * dist);
     const z = Math.round(plant.z + Math.sin(ang) * dist);
-    if (x < 2 || x >= W - 2 || z < 2 || z >= D - 2) return;
+    if (x < 3 || x >= W - 3 || z < 3 || z >= D - 3) return;
     const top = g.top(x, z);
     if (top < 0 || top >= H - 6) return;
     const ti = g.idx(x, top, z);
@@ -554,7 +564,7 @@ export class Simulation {
     if (needsSoil && tt !== Cell.SOIL && tt !== Cell.SAND) return;
     if (g.wet[ti] < 24 && plant.species !== 'succulent') return; // seeds need damp ground
     for (const other of this.plants) {
-      if (Math.abs(other.x - x) + Math.abs(other.z - z) < 6) return;
+      if (Math.abs(other.x - x) + Math.abs(other.z - z) < 9) return;
     }
     this.addPlant(plant.species, x, top + 1, z, 0.06);
     this.events.push(`A ${plant.species} seedling sprouted \u{1F331}`);
