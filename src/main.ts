@@ -107,7 +107,9 @@ function init(): void {
 
     statsAccum += rawDt;
     if (statsAccum > 1) {
-      ui.updateStats(sim.stats());
+      const st = sim.stats();
+      ui.updateStats(st);
+      ui.updateAlerts(sim.alerts(st));
       statsAccum = 0;
     }
 

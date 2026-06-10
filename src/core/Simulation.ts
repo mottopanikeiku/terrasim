@@ -78,7 +78,7 @@ export class Simulation {
       if (t === Cell.WATER && openAbove) {
         // Evaporation from exposed water.
         this.humidity = Math.min(100, this.humidity + 0.05);
-        if (Math.random() < 0.0035) {
+        if (Math.random() < 0.0012) {
           type[i] = Cell.EMPTY;
           g.shade[i] = 0;
           g.flags[i] = 0;
@@ -147,7 +147,7 @@ export class Simulation {
       this.changed = true;
       return;
     }
-    if (!damp || Math.random() > 0.18) return;
+    if (!damp || Math.random() > 0.08) return;
     if (this.mossCells() >= MAX_MOSS) return;
 
     // Creep to a neighboring surface within one step up/down.
@@ -400,19 +400,21 @@ export class Simulation {
       }
 
       // Drink: species differ in thirst — succulents shrug off droughts.
+      // Paced for real-time watching: a thirsty fern wilts after ~2 dry
+      // minutes and has ~2 more before it's gone.
       const THIRST: Record<Species, number> = {
-        succulent: 0.4, grass: 1.8, flower: 2.4, fern: 2.6, mushroom: 2.8,
+        succulent: 0.03, grass: 0.11, flower: 0.15, fern: 0.16, mushroom: 0.18,
       };
       const drank = this.drink(plant);
       if (drank) {
-        plant.health = Math.min(100, plant.health + 4);
+        plant.health = Math.min(100, plant.health + 1.2);
       } else {
         plant.health -= THIRST[plant.species];
       }
 
       if (plant.health <= 0) {
         plant.look = 2;
-        plant.decayT = 35;
+        plant.decayT = 120;
         this.events.push(`A ${plant.species} withered away \u{1F342}`);
         continue;
       }
@@ -424,8 +426,10 @@ export class Simulation {
         this.events.push(`The ${plant.species} perked back up \u{1F33F}`);
       }
 
+      // Real-time growth: a seedling takes ~9 minutes to mature at 1x —
+      // slow enough to watch, fast enough to feel alive.
       if (plant.look === 0 && drank && plant.stage < 1) {
-        plant.stage = Math.min(1, plant.stage + 0.02);
+        plant.stage = Math.min(1, plant.stage + 0.0008);
         if (plant.stage >= 1 && plant.species === 'flower' && !this.firstBloomSeen) {
           this.firstBloomSeen = true;
           this.events.push('First bloom! \u{1F338}');
@@ -458,7 +462,7 @@ export class Simulation {
       }
     }
     if (bestI >= 0 && bestWet >= 24) {
-      this.grid.wet[bestI] -= 10;
+      this.grid.wet[bestI] -= 4;
       return true;
     }
     return false;
@@ -506,7 +510,7 @@ export class Simulation {
 
   private trySpread(plant: Plant): void {
     const chance: Record<Species, number> = {
-      grass: 0.004, flower: 0.0025, fern: 0.0018, mushroom: 0.003, succulent: 0.001,
+      grass: 0.002, flower: 0.0012, fern: 0.0009, mushroom: 0.0015, succulent: 0.0005,
     };
     if (Math.random() > chance[plant.species]) return;
     const g = this.grid;
@@ -537,6 +541,17 @@ export class Simulation {
       const d = Math.max(Math.abs(plant.x - x), Math.abs(plant.y - y), Math.abs(plant.z - z));
       if (d <= r + 1) this.plants.splice(p, 1);
     }
+  }
+
+  // Condition alerts: what the keeper should know right now.
+  alerts(s: { humidity: number; water: number; plants: number; healthyFrac: number }): string[] {
+    const out: string[] = [];
+    if (s.plants === 0) out.push('\u{1F331} Nothing is growing — scatter some seeds');
+    if (s.water === 0) out.push('\u{1F3DC}\u{FE0F} No standing water — the water cycle has stalled');
+    else if (s.humidity < 42) out.push('\u{1F4A8} The air is dry — pour some water');
+    if (s.humidity > 88) out.push('\u{1F4A6} Very humid — the glass is fogging heavily');
+    if (s.plants > 0 && s.healthyFrac < 0.7) out.push('\u{1F940} Plants are thirsty — water the soil near them');
+    return out;
   }
 
   // Aggregate stats for the UI.

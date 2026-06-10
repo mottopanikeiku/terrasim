@@ -128,28 +128,25 @@ const drawFern: Draw = (ctx, w, h) => {
 
 export class Room {
   constructor(scene: THREE.Scene) {
-    // Wallpaper: warm cream with soft vertical stripes and tiny dots.
-    const wallTex = canvasTexture(512, 512, (ctx) => {
-      ctx.fillStyle = '#e7d7ba';
-      ctx.fillRect(0, 0, 512, 512);
-      for (let x = 0; x < 512; x += 64) {
-        ctx.fillStyle = 'rgba(196, 168, 124, 0.25)';
-        ctx.fillRect(x, 0, 30, 512);
-      }
-      ctx.fillStyle = 'rgba(173, 138, 96, 0.4)';
-      for (let x = 47; x < 512; x += 64) {
-        for (let y = 16; y < 512; y += 42) {
-          ctx.beginPath();
-          ctx.arc(x, y + (x % 128 === 47 ? 0 : 21), 2.4, 0, Math.PI * 2);
-          ctx.fill();
-        }
+    // Quiet warm plaster wall, darker toward the edges so the lit tank is
+    // the unambiguous subject — busy wallpaper patterns read cheap.
+    const wallTex = canvasTexture(1024, 512, (ctx, w, h) => {
+      const g = ctx.createRadialGradient(w / 2, h * 0.62, 60, w / 2, h * 0.62, w * 0.62);
+      g.addColorStop(0, '#b59c79');
+      g.addColorStop(0.55, '#9a8161');
+      g.addColorStop(1, '#6e5a42');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+      // Faint plaster speckle for tooth.
+      for (let i = 0; i < 2600; i++) {
+        const a = Math.random() * 0.05;
+        ctx.fillStyle = Math.random() < 0.5 ? `rgba(255,240,210,${a})` : `rgba(40,28,16,${a})`;
+        ctx.fillRect(Math.random() * w, Math.random() * h, 1.5, 1.5);
       }
     });
-    wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping;
-    wallTex.repeat.set(4, 2.2);
     const wall = new THREE.Mesh(
       new THREE.PlaneGeometry(90, 44),
-      new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.95, metalness: 0 })
+      new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.97, metalness: 0 })
     );
     wall.position.set(0, 18, -21);
     scene.add(wall);
@@ -174,16 +171,23 @@ export class Room {
 
   private hangPoster(scene: THREE.Scene, draw: Draw, x: number, y: number, w: number, h: number, tilt: number): void {
     const group = new THREE.Group();
+    // Slim dark walnut frame + wide cream mat: gallery framing reads
+    // considered, not clipart.
     const frame = new THREE.Mesh(
-      new THREE.BoxGeometry(w + 0.34, h + 0.34, 0.22),
-      new THREE.MeshStandardMaterial({ color: 0x8a6844, roughness: 0.5, metalness: 0.1 })
+      new THREE.BoxGeometry(w + 0.16, h + 0.16, 0.16),
+      new THREE.MeshStandardMaterial({ color: 0x3c2e20, roughness: 0.45, metalness: 0.05 })
     );
-    const art = new THREE.Mesh(
+    const mat = new THREE.Mesh(
       new THREE.PlaneGeometry(w, h),
+      new THREE.MeshStandardMaterial({ color: 0xf2ead8, roughness: 0.9 })
+    );
+    mat.position.z = 0.085;
+    const art = new THREE.Mesh(
+      new THREE.PlaneGeometry(w * 0.68, h * 0.68),
       new THREE.MeshStandardMaterial({ map: canvasTexture(192, Math.round(192 * h / w), draw), roughness: 0.9 })
     );
-    art.position.z = 0.115;
-    group.add(frame, art);
+    art.position.z = 0.095;
+    group.add(frame, mat, art);
     group.position.set(x, y, -20.6);
     group.rotation.z = tilt;
     scene.add(group);

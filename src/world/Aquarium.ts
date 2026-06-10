@@ -20,7 +20,7 @@ export class Aquarium {
     const glass = new THREE.MeshPhysicalMaterial({
       color: 0xf4fbf7,
       transparent: true,
-      opacity: 0.10,
+      opacity: 0.06,
       roughness: 0.04,
       metalness: 0.0,
       envMapIntensity: 0.7,
@@ -95,31 +95,30 @@ export class Aquarium {
     const c = document.createElement('canvas');
     c.width = c.height = 1024;
     const ctx = c.getContext('2d')!;
-    // Warm honey-oak base.
+    // Deep walnut, low-contrast grain: rich and quiet so it doesn't compete
+    // with the tank.
     const grad = ctx.createLinearGradient(0, 0, 1024, 1024);
-    grad.addColorStop(0, '#8a6238');
-    grad.addColorStop(0.5, '#96703f');
-    grad.addColorStop(1, '#82592f');
+    grad.addColorStop(0, '#5a3f26');
+    grad.addColorStop(0.5, '#64472b');
+    grad.addColorStop(1, '#523a22');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 1024, 1024);
-    // Planks with subtle tonal differences and seams.
-    const plankH = 128;
-    for (let p = 0; p < 8; p++) {
+    const plankH = 256;
+    for (let p = 0; p < 4; p++) {
       const y0 = p * plankH;
-      ctx.fillStyle = `rgba(${60 + Math.random() * 40 | 0}, ${40 + Math.random() * 26 | 0}, ${20 + Math.random() * 14 | 0}, 0.18)`;
+      ctx.fillStyle = `rgba(${40 + Math.random() * 26 | 0}, ${28 + Math.random() * 16 | 0}, ${14 + Math.random() * 10 | 0}, 0.12)`;
       ctx.fillRect(0, y0, 1024, plankH);
-      ctx.fillStyle = 'rgba(30, 18, 8, 0.55)';
-      ctx.fillRect(0, y0, 1024, 2);
-      // Grain lines within the plank.
-      for (let i = 0; i < 26; i++) {
-        const y = y0 + 6 + Math.random() * (plankH - 10);
-        const lum = 0.8 + Math.random() * 0.45;
-        ctx.strokeStyle = `rgba(${(120 * lum) | 0}, ${(86 * lum) | 0}, ${(50 * lum) | 0}, ${0.16 + Math.random() * 0.22})`;
-        ctx.lineWidth = 0.8 + Math.random() * 1.6;
+      ctx.fillStyle = 'rgba(24, 14, 6, 0.35)';
+      ctx.fillRect(0, y0, 1024, 1.5);
+      for (let i = 0; i < 18; i++) {
+        const y = y0 + 10 + Math.random() * (plankH - 16);
+        const lum = 0.85 + Math.random() * 0.3;
+        ctx.strokeStyle = `rgba(${(96 * lum) | 0}, ${(68 * lum) | 0}, ${(40 * lum) | 0}, ${0.08 + Math.random() * 0.1})`;
+        ctx.lineWidth = 1 + Math.random() * 1.6;
         ctx.beginPath();
         ctx.moveTo(0, y);
-        for (let x = 0; x <= 1024; x += 24) {
-          ctx.lineTo(x, y + Math.sin(x * 0.013 + i * 3 + p) * 2.5 + (Math.random() - 0.5) * 1.5);
+        for (let x = 0; x <= 1024; x += 32) {
+          ctx.lineTo(x, y + Math.sin(x * 0.009 + i * 3 + p) * 3 + (Math.random() - 0.5) * 1);
         }
         ctx.stroke();
       }
@@ -127,7 +126,7 @@ export class Aquarium {
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(2.4, 1.6);
+    tex.repeat.set(1.6, 1.2);
     tex.anisotropy = 4;
     return tex;
   }
