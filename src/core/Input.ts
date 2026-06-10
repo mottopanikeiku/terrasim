@@ -278,6 +278,14 @@ export class Input {
     this.tool = tool;
   }
 
+  // The pour material currently streaming, if any (drives the pour sound).
+  pouringTool(): 'sand' | 'soil' | 'gravel' | 'water' | null {
+    if (this.pouring && this.tool in POUR_RANGE) {
+      return this.tool as 'sand' | 'soil' | 'gravel' | 'water';
+    }
+    return null;
+  }
+
   // Ray-grid DDA (Amanatides & Woo). Returns the first non-empty cell hit,
   // the empty cell just before it (surface), and the column for pouring.
   // includeWaterAsHit: erase should target water too (it always does);

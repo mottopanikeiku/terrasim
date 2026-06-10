@@ -11,6 +11,7 @@ import { PlantRenderer } from './world/PlantRenderer';
 import { buildDefaultScene } from './world/DefaultScene';
 import { UI } from './ui/UI';
 import { save, load, clearSave } from './core/Storage';
+import { SoundScape } from './core/SoundScape';
 
 const SIM_HZ = 30;
 
@@ -45,6 +46,10 @@ function init(): void {
   ui.onAuto = (on) => sceneMgr.setAuto(on);
   sceneMgr.onPresetShift = (p) => ui.setActivePreset(p);
   ui.onSpeed = (mult) => { speed = mult; };
+
+  const audio = new SoundScape();
+  ui.onSound = (on) => audio.setEnabled(on);
+  room.onDrip = () => audio.plip();
   ui.onPhoto = () => {
     sceneMgr.renderer.render(sceneMgr.scene, sceneMgr.camera);
     const a = document.createElement('a');
@@ -106,6 +111,9 @@ function init(): void {
     critters.update(rawDt, time, sceneMgr.currentPreset === 'night');
     condensation.update(rawDt, sim.humidity);
     room.update(rawDt);
+    const pourKind = input.pouringTool();
+    if (pourKind) audio.pourTick(pourKind);
+    audio.update(rawDt, sceneMgr.currentPreset);
     sceneMgr.update(rawDt);
 
     statsAccum += rawDt;

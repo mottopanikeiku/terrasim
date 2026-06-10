@@ -130,6 +130,7 @@ const drawFern: Draw = (ctx, w, h) => {
 };
 
 export class Room {
+  onDrip?: () => void; // fired when the watering-can drop lands
   private drip: THREE.Mesh;
   private dripT = 4;
   private dripY = 0;
@@ -326,6 +327,7 @@ export class Room {
         this.dripFalling = false;
         this.drip.visible = false;
         this.dripT = 6 + Math.random() * 9;
+        this.onDrip?.();
       } else {
         this.drip.position.y = this.dripY;
         this.drip.scale.y = 1.4; // stretched as it falls

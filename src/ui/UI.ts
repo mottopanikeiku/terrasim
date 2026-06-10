@@ -157,6 +157,20 @@ export class UI {
     });
     actions.appendChild(speedBtn);
 
+    // Sound: starts muted; the toggle click is the gesture that unlocks audio.
+    const sound = document.createElement('button');
+    sound.className = 'chip';
+    sound.title = 'Sound — birdsong, crickets, drips';
+    sound.textContent = '\u{1F507}';
+    sound.addEventListener('click', () => {
+      const on = !sound.classList.contains('active');
+      sound.classList.toggle('active', on);
+      sound.textContent = on ? '\u{1F50A}' : '\u{1F507}';
+      this.onSound?.(on);
+      if (on) this.hint('Listen closely \u{1F426}', 2500);
+    });
+    actions.appendChild(sound);
+
     const guide = document.createElement('button');
     guide.className = 'chip';
     guide.title = 'How terrariums work';
