@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { W, H, D, V, cellToWorld } from './constants';
 import { Cell, Grid, WET_VISIBLE, WET_SOAKED } from './Grid';
-import { PALETTE, RANGES } from './palette';
+import { PALETTE } from './palette';
 
-const MAX_FINE = 110000;
-const MAX_PEBBLE = 50000;
-const MAX_WATER = 40000;
+const MAX_FINE = 260000;
+const MAX_PEBBLE = 140000;
+const MAX_TUFT = 30000;
 
 // 24 precomputed jittered orientations (rotation+scale baked into a 3x3),
 // picked per-cell by position hash, so grains look like tumbled crumbs and
@@ -44,7 +44,6 @@ export class VoxelRenderer {
   private fine: THREE.InstancedMesh;
   private pebble: THREE.InstancedMesh;
   private tuft: THREE.InstancedMesh;
-  private water: THREE.InstancedMesh;
   // Gentle jitter for fine grains (heavy rotation made surfaces look noisy),
   // chunky jitter for pebbles, soft for moss cushions.
   private fineJitter = makeJitterBasis(24, 0.07, 1.02, 1.1);
@@ -84,17 +83,10 @@ export class VoxelRenderer {
     this.tuft = makeMesh(
       tuftGeo,
       new THREE.MeshStandardMaterial({ roughness: 1.0, metalness: 0, envMapIntensity: 0.2 }),
-      12000, true
+      MAX_TUFT, true
     );
-    this.water = makeMesh(
-      new THREE.BoxGeometry(V, V, V),
-      new THREE.MeshPhysicalMaterial({
-        roughness: 0.08, metalness: 0, transparent: true, opacity: 0.55,
-        envMapIntensity: 1.5, depthWrite: false,
-      }),
-      MAX_WATER, false
-    );
-    this.water.receiveShadow = true;
+    // Water is rendered by WaterSurface (a continuous smoothed mesh), not
+    // by instanced cubes — stacked transparent boxes read as a grid.
   }
 
   rebuild(): void {
@@ -106,12 +98,8 @@ export class VoxelRenderer {
     const pc = this.pebble.instanceColor!.array as Float32Array;
     const tm = this.tuft.instanceMatrix.array as Float32Array;
     const tc = this.tuft.instanceColor!.array as Float32Array;
-    const wm = this.water.instanceMatrix.array as Float32Array;
-    const wc = this.water.instanceColor!.array as Float32Array;
-    let nf = 0, np = 0, nt = 0, nw = 0;
+    let nf = 0, np = 0, nt = 0;
     const c = this.tmpColor;
-    // One uniform water color — per-cell variation made pools look patchy.
-    const waterC = PALETTE[RANGES.water.start];
 
     for (let y = 0; y < H; y++) {
       for (let z = 0; z < D; z++) {
@@ -128,25 +116,7 @@ export class VoxelRenderer {
           const ym = y > 0 ? type[i - W * D] : Cell.EMPTY;
           const yp = y < H - 1 ? type[i + W * D] : Cell.EMPTY;
 
-          if (t === Cell.WATER) {
-            if (xm !== Cell.EMPTY && xp !== Cell.EMPTY && zm !== Cell.EMPTY && zp !== Cell.EMPTY && ym !== Cell.EMPTY && yp !== Cell.EMPTY) continue;
-            if (nw >= MAX_WATER) continue;
-            const [px, py, pz] = cellToWorld(x, y, z);
-            const b = nw * 16;
-            // Top-surface cells sit lower and flatter, like a real waterline.
-            const isSurface = yp === Cell.EMPTY;
-            const sy = isSurface ? 0.62 : 1;
-            wm[b] = 1; wm[b + 5] = sy; wm[b + 10] = 1; wm[b + 15] = 1;
-            wm[b + 1] = wm[b + 2] = wm[b + 3] = wm[b + 4] = 0;
-            wm[b + 6] = wm[b + 7] = wm[b + 8] = wm[b + 9] = 0;
-            wm[b + 11] = 0;
-            wm[b + 12] = px;
-            wm[b + 13] = py - (isSurface ? V * 0.19 : 0);
-            wm[b + 14] = pz;
-            wc[nw * 3] = waterC.r; wc[nw * 3 + 1] = waterC.g; wc[nw * 3 + 2] = waterC.b;
-            nw++;
-            continue;
-          }
+          if (t === Cell.WATER) continue; // drawn by WaterSurface
 
           const solidXm = xm !== Cell.EMPTY && xm !== Cell.WATER;
           const solidXp = xp !== Cell.EMPTY && xp !== Cell.WATER;
@@ -158,7 +128,7 @@ export class VoxelRenderer {
 
           const mossy = t === Cell.MOSS;
           const pebbly = t === Cell.GRAVEL || t === Cell.ROCK;
-          if (mossy ? nt >= 12000 : pebbly ? np >= MAX_PEBBLE : nf >= MAX_FINE) continue;
+          if (mossy ? nt >= MAX_TUFT : pebbly ? np >= MAX_PEBBLE : nf >= MAX_FINE) continue;
 
           const [px, py, pz] = cellToWorld(x, y, z);
           const jitterSet = mossy ? this.tuftJitter : pebbly ? this.pebbleJitter : this.fineJitter;
@@ -194,8 +164,7 @@ export class VoxelRenderer {
     this.fine.count = nf;
     this.pebble.count = np;
     this.tuft.count = nt;
-    this.water.count = nw;
-    for (const mesh of [this.fine, this.pebble, this.tuft, this.water]) {
+    for (const mesh of [this.fine, this.pebble, this.tuft]) {
       mesh.instanceMatrix.needsUpdate = true;
       mesh.instanceColor!.needsUpdate = true;
     }
