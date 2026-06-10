@@ -1,5 +1,5 @@
 import { W, H, D } from './constants';
-import { Cell, F_SETTLED, Grid } from './Grid';
+import { Cell, F_SETTLED, Grid, WET_SOAKED, WET_VISIBLE } from './Grid';
 import { Plant, Species } from '../world/Plants';
 import { randomShade } from './palette';
 
@@ -123,8 +123,10 @@ export class Simulation {
       } else if ((t === Cell.SOIL || t === Cell.SAND) && wet[i] > 0) {
         if (openAbove) {
           // Surface soil dries into the air.
+          const before = wet[i];
           const loss = Math.min(wet[i], 3);
           wet[i] -= loss;
+          this.touchIfWetCrossed(i, before);
           this.humidity = Math.min(100, this.humidity + loss * 0.004);
           this.changed = true;
         }
@@ -133,8 +135,11 @@ export class Simulation {
         if (below >= 0 && wet[i] > 64) {
           const bt = type[below] as Cell;
           if ((bt === Cell.SOIL || bt === Cell.SAND) && wet[below] < wet[i] - 32) {
+            const beforeB = wet[below], beforeI = wet[i];
             wet[below] = Math.min(255, wet[below] + 24);
             wet[i] -= 24;
+            this.touchIfWetCrossed(below, beforeB);
+            this.touchIfWetCrossed(i, beforeI);
           }
         }
       } else if (t === Cell.MOSS) {
@@ -157,7 +162,9 @@ export class Simulation {
         const i = this.grid.idx(x, top, z);
         const t = type[i] as Cell;
         if ((t === Cell.SOIL || t === Cell.SAND) && wet[i] < 200) {
+          const before = wet[i];
           wet[i] = Math.min(255, wet[i] + 50);
+          this.touchIfWetCrossed(i, before);
           this.humidity -= 0.5;
           this.changed = true;
         }
@@ -273,6 +280,16 @@ export class Simulation {
       this.changed = true;
     }
     return added > 0;
+  }
+
+  // Moisture changes only need a remesh when they cross a visual threshold
+  // (damp / soaked darkening) — otherwise wet drift would dirty every chunk
+  // every tick.
+  private touchIfWetCrossed(i: number, before: number): void {
+    const now = this.grid.wet[i];
+    if ((before >= WET_VISIBLE) !== (now >= WET_VISIBLE) || (before >= WET_SOAKED) !== (now >= WET_SOAKED)) {
+      this.grid.touchIndex(i);
+    }
   }
 
   private wakeIndex(i: number): void {
@@ -587,6 +604,7 @@ export class Simulation {
     }
     if (bestI >= 0 && bestWet >= 24) {
       this.grid.wet[bestI] -= 4;
+      this.touchIfWetCrossed(bestI, bestWet);
       return true;
     }
     return false;
@@ -773,6 +791,7 @@ export class Simulation {
 
     this.mossCount = -1;
     this.changed = true;
+    this.grid.touchAll();
     return summary;
   }
 

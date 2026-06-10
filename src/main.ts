@@ -1,14 +1,14 @@
 import { SceneManager } from './core/Scene';
 import { Grid } from './core/Grid';
 import { Simulation } from './core/Simulation';
-import { VoxelRenderer } from './core/VoxelRenderer';
+import { TerrainRenderer } from './render/TerrainRenderer';
+import { WaterRenderer } from './render/WaterRenderer';
 import { Input } from './core/Input';
 import { Aquarium } from './world/Aquarium';
 import { Room } from './world/Room';
 import { Critters } from './world/Critters';
 import { Condensation } from './world/Condensation';
 import { PlantRenderer } from './world/PlantRenderer';
-import { WaterSurface } from './world/WaterSurface';
 import { buildDefaultScene } from './world/DefaultScene';
 import { UI } from './ui/UI';
 import { save, load, clearSave } from './core/Storage';
@@ -42,8 +42,8 @@ function init(): void {
   const grid = new Grid();
   const room = new Room(sceneMgr.scene, grid);
   const sim = new Simulation(grid);
-  const voxels = new VoxelRenderer(sceneMgr.scene, grid);
-  const water = new WaterSurface(sceneMgr.scene);
+  const terrain = new TerrainRenderer(sceneMgr.scene, grid);
+  const water = new WaterRenderer(sceneMgr.scene, grid);
   const plantRenderer = new PlantRenderer(sceneMgr.scene, sim);
   const critters = new Critters(sceneMgr.scene, grid, sim);
   const condensation = new Condensation(sceneMgr.scene);
@@ -76,10 +76,15 @@ function init(): void {
   }
   sim.events.length = 0; // don't toast the pre-roll
 
+  // First frame should be complete: build every chunk before showing.
+  grid.touchAll();
+  terrain.update(Infinity);
+  water.update(Infinity);
+
   const input = new Input(sceneMgr.renderer.domElement, sceneMgr.camera, grid, sim, sceneMgr.scene);
 
   // Debug handle for development tooling.
-  (window as any).__terra = { grid, sim, sceneMgr, critters, plantRenderer, voxels, water };
+  (window as any).__terra = { grid, sim, sceneMgr, critters, plantRenderer, terrain, water };
 
   const ui = new UI();
   let speed = 1;
@@ -125,7 +130,6 @@ function init(): void {
   let saveAccum = 0;
   let statsAccum = 0;
   let time = 0;
-  let lastRebuild = 0;
 
   function frame(now: number): void {
     requestAnimationFrame(frame);
@@ -152,17 +156,16 @@ function init(): void {
       ui.toast(msg);
     }
 
-    // Rebuilds are the heaviest step; cap them at ~25Hz so sustained pours
-    // keep a fluid framerate.
-    if (sim.changed && now - lastRebuild > 38) {
-      voxels.rebuild();
-      water.rebuild(grid);
+    // Remesh a few dirty chunks per frame; the surface-nets renderers
+    // track grid.chunkSeq so quiet chunks cost nothing.
+    terrain.update(3);
+    water.update(3);
+    if (sim.changed) {
       sim.changed = false;
-      lastRebuild = now;
       dirty = true;
     }
 
-    water.update(time);
+    water.setTime(time);
     plantRenderer.update(rawDt, time);
     critters.update(rawDt, time, sceneMgr.currentPreset === 'night');
     condensation.update(rawDt, sim.humidity);
