@@ -211,10 +211,29 @@ export class SceneManager {
   }
 
   currentPreset: PresetName = 'golden';
+  onPresetShift?: (p: PresetName) => void;
+
+  // The room breathes on its own: golden morning -> day -> golden evening
+  // -> night, over ~7.5 minutes. Picking a preset by hand pauses the drift.
+  private auto = true;
+  private cycleT = 0;
+  private static CYCLE: [PresetName, number][] = [
+    ['golden', 75], ['day', 150], ['golden', 75], ['night', 150],
+  ];
 
   setPreset(name: PresetName): void {
+    this.auto = false;
+    this.applyPreset(name);
+  }
+
+  setAuto(on: boolean): void {
+    this.auto = on;
+  }
+
+  private applyPreset(name: PresetName): void {
     this.currentPreset = name;
     this.target = this.cloneState(PRESETS[name]);
+    this.onPresetShift?.(name);
   }
 
   private apply(s: LightState): void {
@@ -232,8 +251,22 @@ export class SceneManager {
   }
 
   update(dt: number): void {
-    // Smooth exponential approach toward the target preset.
-    const k = 1 - Math.exp(-3.5 * dt);
+    if (this.auto) {
+      const total = SceneManager.CYCLE.reduce((s, [, d]) => s + d, 0);
+      this.cycleT = (this.cycleT + dt) % total;
+      let acc = 0;
+      for (const [preset, dur] of SceneManager.CYCLE) {
+        acc += dur;
+        if (this.cycleT < acc) {
+          if (preset !== this.currentPreset) this.applyPreset(preset);
+          break;
+        }
+      }
+    }
+
+    // Smooth exponential approach toward the target preset. Slower blend so
+    // the automatic cycle feels like drifting light, not a switch.
+    const k = 1 - Math.exp(-(this.auto ? 0.5 : 3.5) * dt);
     const c = this.current, t = this.target;
     c.sunColor.lerp(t.sunColor, k);
     c.sunIntensity += (t.sunIntensity - c.sunIntensity) * k;

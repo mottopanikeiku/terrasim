@@ -42,6 +42,8 @@ function init(): void {
   let speed = 1;
   ui.onTool = (tool) => input.setTool(tool);
   ui.onPreset = (preset) => sceneMgr.setPreset(preset);
+  ui.onAuto = (on) => sceneMgr.setAuto(on);
+  sceneMgr.onPresetShift = (p) => ui.setActivePreset(p);
   ui.onSpeed = (mult) => { speed = mult; };
   ui.onPhoto = () => {
     sceneMgr.renderer.render(sceneMgr.scene, sceneMgr.camera);

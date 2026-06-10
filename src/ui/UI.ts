@@ -38,6 +38,8 @@ export interface Stats {
 export class UI {
   onTool?: (tool: ToolId) => void;
   onPreset?: (preset: PresetName) => void;
+  onAuto?: (on: boolean) => void;
+  onSound?: (on: boolean) => void;
   onPhoto?: () => void;
   onReset?: () => void;
   onSpeed?: (mult: number) => void;
@@ -107,6 +109,20 @@ export class UI {
     addGroup('', [ERASE_TOOL]);
 
     const presets = root.querySelector('#presets')!;
+
+    // Auto day/night drift — on by default; picking a time pauses it.
+    const autoBtn = document.createElement('button');
+    autoBtn.className = 'chip active';
+    autoBtn.title = 'Let time drift on its own';
+    autoBtn.textContent = '\u{1F504}';
+    autoBtn.addEventListener('click', () => {
+      const on = !autoBtn.classList.contains('active');
+      autoBtn.classList.toggle('active', on);
+      this.onAuto?.(on);
+    });
+    this.buttons.set('preset-auto', autoBtn);
+    presets.appendChild(autoBtn);
+
     const presetDefs: [PresetName, string, string][] = [
       ['day', '☀️', 'Daylight'],
       ['golden', '\u{1F305}', 'Golden hour'],
@@ -118,8 +134,8 @@ export class UI {
       btn.title = label;
       btn.textContent = icon;
       btn.addEventListener('click', () => {
-        presets.querySelectorAll('.chip').forEach((c) => c.classList.remove('active'));
-        btn.classList.add('active');
+        this.setActivePreset(name);
+        autoBtn.classList.remove('active'); // manual pick pauses the drift
         this.onPreset?.(name);
       });
       this.buttons.set(`preset-${name}`, btn);
@@ -172,6 +188,13 @@ export class UI {
     this.buttons.forEach((btn, key) => {
       if (!key.startsWith('preset-')) btn.classList.toggle('active', key === id);
     });
+  }
+
+  // Reflect the current time of day (the auto cycle calls this as it drifts).
+  setActivePreset(name: PresetName): void {
+    for (const p of ['day', 'golden', 'night'] as PresetName[]) {
+      this.buttons.get(`preset-${p}`)?.classList.toggle('active', p === name);
+    }
   }
 
   hint(text: string, ms = 3000): void {
