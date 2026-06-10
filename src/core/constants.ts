@@ -1,9 +1,11 @@
 // Aquarium interior grid dimensions (cells) and cell size (world units).
 // Tank interior: 24 x 10 x 10 world units (w x h x d) — panoramic.
-export const W = 96;
-export const H = 40;
-export const D = 40;
-export const V = 0.25;
+// Cells are deliberately small (1/6 unit) so grains read as granules,
+// not blocks.
+export const W = 144;
+export const H = 60;
+export const D = 60;
+export const V = 1 / 6;
 
 export const TANK_W = W * V;
 export const TANK_H = H * V;

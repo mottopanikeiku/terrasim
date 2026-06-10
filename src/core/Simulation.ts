@@ -1,5 +1,5 @@
 import { W, H, D } from './constants';
-import { Cell, F_SETTLED, Grid, isGranular } from './Grid';
+import { Cell, F_SETTLED, Grid } from './Grid';
 import { Plant, Species } from '../world/Plants';
 import { randomShade } from './palette';
 
@@ -14,14 +14,34 @@ import { randomShade } from './palette';
 //   rocks, and retreats when the tank dries out
 
 const MAX_PLANTS = 60;
-const MAX_MOSS = 1600;
+const MAX_MOSS = 3600;
+
+// Species thirst (health lost per dry growth tick) and reseed chances —
+// shared by the live growth loop and the away-time fast-forward.
+const THIRST: Record<Species, number> = {
+  succulent: 0.03, grass: 0.11, flower: 0.15, fern: 0.16, mushroom: 0.18,
+};
+const SPREAD_CHANCE: Record<Species, number> = {
+  grass: 0.002, flower: 0.0012, fern: 0.0009, mushroom: 0.0015, succulent: 0.0005,
+};
+
+// What happened while the keeper was away — for the welcome-back card.
+export interface AwaySummary {
+  seconds: number;
+  matured: number;
+  sprouted: number;
+  wilted: number;
+  died: number;
+  composted: number;
+  mossGrown: number;
+  pondShrank: boolean;
+}
 
 export class Simulation {
   changed = true; // renderer should rebuild
   humidity = 50;  // 0..100, air moisture inside the tank
   events: string[] = []; // notable happenings, drained by the UI
 
-  private flip = false;
   private plants: Plant[] = [];
   private nextPlantId = 1;
   private growthTimer = 0;
@@ -35,27 +55,29 @@ export class Simulation {
   tick(): void {
     const g = this.grid;
     const { type, flags } = g;
-    this.flip = !this.flip;
     let moved = false;
 
-    for (let y = 0; y < H; y++) {
-      for (let zi = 0; zi < D; zi++) {
-        const z = this.flip ? D - 1 - zi : zi;
-        for (let xi = 0; xi < W; xi++) {
-          const x = this.flip ? W - 1 - xi : xi;
-          const i = g.idx(x, y, z);
-          const t = type[i] as Cell;
-          if (t === Cell.EMPTY) continue;
-          if (flags[i] & F_SETTLED) continue;
+    // Hot path: one linear pass. The array layout is y-major ascending, so
+    // linear order IS bottom-up; coordinates are decoded only for the few
+    // active cells. Direction bias is handled by per-grain shuffled dirs.
+    const n = type.length;
+    const WD = W * D;
+    for (let i = 0; i < n; i++) {
+      const t = type[i];
+      if (t === Cell.EMPTY) continue;
+      if (flags[i] & F_SETTLED) continue;
 
-          if (isGranular(t)) {
-            moved = this.stepGranular(x, y, z, i) || moved;
-          } else if (t === Cell.WATER) {
-            moved = this.stepWater(x, y, z, i) || moved;
-          } else {
-            flags[i] |= F_SETTLED; // static types never move
-          }
-        }
+      const y = (i / WD) | 0;
+      const rem = i - y * WD;
+      const z = (rem / W) | 0;
+      const x = rem - z * W;
+
+      if (t === Cell.SAND || t === Cell.SOIL || t === Cell.GRAVEL) {
+        moved = this.stepGranular(x, y, z, i) || moved;
+      } else if (t === Cell.WATER) {
+        moved = this.stepWater(x, y, z, i) || moved;
+      } else {
+        flags[i] |= F_SETTLED; // static types never move
       }
     }
 
@@ -69,7 +91,7 @@ export class Simulation {
     const { type, wet } = g;
     const n = type.length;
 
-    for (let s = 0; s < 140; s++) {
+    for (let s = 0; s < 320; s++) {
       const i = (Math.random() * n) | 0;
       const t = type[i] as Cell;
       const above = i + W * D;
@@ -79,6 +101,19 @@ export class Simulation {
         // Evaporation from exposed water.
         this.humidity = Math.min(100, this.humidity + 0.022);
         if (Math.random() < 0.0012) {
+          type[i] = Cell.EMPTY;
+          g.shade[i] = 0;
+          g.flags[i] = 0;
+          this.wakeIndex(i);
+          this.changed = true;
+        } else if (Math.random() < 0.6 && this.puddleSize(i, 14) < 14) {
+          // Tiny trapped puddles (water threaded between pebbles, splash
+          // leftovers) seep into the ground — only real pools persist.
+          const below = i - W * D;
+          if (below >= 0 && (type[below] === Cell.SOIL || type[below] === Cell.SAND)) {
+            wet[below] = Math.min(255, wet[below] + 60);
+          }
+          this.humidity = Math.min(100, this.humidity + 0.03);
           type[i] = Cell.EMPTY;
           g.shade[i] = 0;
           g.flags[i] = 0;
@@ -148,16 +183,16 @@ export class Simulation {
       this.changed = true;
       return;
     }
-    if (!damp || Math.random() > 0.08) return;
+    if (!damp || Math.random() > 0.14) return;
     if (this.mossCells() >= MAX_MOSS) return;
 
-    // Creep to a neighboring surface within one step up/down.
+    // Creep to a neighboring surface within a small step up/down.
     const dx = Math.random() < 0.5 ? 1 : -1;
     const dz = Math.random() < 0.5 ? 1 : -1;
     const nx = Math.random() < 0.5 ? x + dx : x;
     const nz = nx === x ? z + dz : z;
     if (nx < 0 || nx >= W || nz < 0 || nz >= D) return;
-    for (let ny = Math.min(H - 2, y + 1); ny >= Math.max(1, y - 2); ny--) {
+    for (let ny = Math.min(H - 2, y + 2); ny >= Math.max(1, y - 3); ny--) {
       const ti = g.idx(nx, ny, nz);
       const bi = ti - W * D;
       const bt = g.type[bi] as Cell;
@@ -172,6 +207,44 @@ export class Simulation {
     }
   }
 
+  // Size of the connected water body containing cell i, capped at `cap`
+  // (BFS over the 6-neighborhood; tiny bound keeps this O(cap)).
+  private puddleStack: number[] = [];
+  private puddleSeen = new Set<number>();
+  private puddleSize(start: number, cap: number): number {
+    const { type } = this.grid;
+    const WD = W * D;
+    const stack = this.puddleStack;
+    const seen = this.puddleSeen;
+    stack.length = 0;
+    seen.clear();
+    stack.push(start);
+    seen.add(start);
+    let size = 0;
+    while (stack.length > 0) {
+      const i = stack.pop()!;
+      size++;
+      if (size >= cap) return size;
+      const y = (i / WD) | 0;
+      const rem = i - y * WD;
+      const z = (rem / W) | 0;
+      const x = rem - z * W;
+      const tryCell = (j: number) => {
+        if (j >= 0 && j < type.length && type[j] === Cell.WATER && !seen.has(j)) {
+          seen.add(j);
+          stack.push(j);
+        }
+      };
+      if (x > 0) tryCell(i - 1);
+      if (x < W - 1) tryCell(i + 1);
+      if (z > 0) tryCell(i - W);
+      if (z < D - 1) tryCell(i + W);
+      if (y > 0) tryCell(i - WD);
+      if (y < H - 1) tryCell(i + WD);
+    }
+    return size;
+  }
+
   mossCells(): number {
     if (this.mossCount < 0) {
       this.mossCount = 0;
@@ -183,9 +256,9 @@ export class Simulation {
   paintMoss(cx: number, cz: number): boolean {
     const g = this.grid;
     let added = 0;
-    for (let n = 0; n < 14; n++) {
-      const x = cx + Math.round((Math.random() - 0.5) * 5);
-      const z = cz + Math.round((Math.random() - 0.5) * 5);
+    for (let n = 0; n < 26; n++) {
+      const x = cx + Math.round((Math.random() - 0.5) * 8);
+      const z = cz + Math.round((Math.random() - 0.5) * 8);
       if (x < 0 || x >= W || z < 0 || z >= D) continue;
       const top = g.top(x, z);
       if (top < 0 || top >= H - 2) continue;
@@ -257,7 +330,12 @@ export class Simulation {
     }
     const belowT = g.get(x, y - 1, z);
     if (belowT === Cell.EMPTY) {
-      this.move(x, y, z, i, x, y - 1, z);
+      // Free fall covers two cells per tick so fine grains still drop briskly.
+      if (y > 1 && g.get(x, y - 2, z) === Cell.EMPTY) {
+        this.move(x, y, z, i, x, y - 2, z);
+      } else {
+        this.move(x, y, z, i, x, y - 1, z);
+      }
       return true;
     }
     if (belowT === Cell.WATER) {
@@ -308,17 +386,31 @@ export class Simulation {
         return true;
       }
       if (bt === Cell.EMPTY) {
-        this.move(x, y, z, i, x, y - 1, z);
+        if (y > 1 && g.get(x, y - 2, z) === Cell.EMPTY) {
+          this.move(x, y, z, i, x, y - 2, z);
+        } else {
+          this.move(x, y, z, i, x, y - 1, z);
+        }
         return true;
       }
     }
 
-    // Flow downhill: diagonal drops first.
+    // Flow downhill: diagonal drops first. A cell riding on top of other
+    // water also skates sideways across the surface — that's how a poured
+    // mound levels out into a flat sheet that actually submerges the bed.
+    // (No jitter risk: on a full flat surface there is no EMPTY side cell.)
     for (const [dx, dz] of this.shuffledDirs()) {
       const nx = x + dx, nz = z + dz;
-      if (y > 0 && g.get(nx, y, nz) === Cell.EMPTY && g.get(nx, y - 1, nz) === Cell.EMPTY) {
-        this.move(x, y, z, i, nx, y - 1, nz);
-        return true;
+      if (y > 0 && g.get(nx, y, nz) === Cell.EMPTY) {
+        const diag = g.get(nx, y - 1, nz);
+        if (diag === Cell.EMPTY) {
+          this.move(x, y, z, i, nx, y - 1, nz);
+          return true;
+        }
+        if (diag === Cell.WATER && g.get(x, y - 1, z) === Cell.WATER && Math.random() < 0.5) {
+          this.move(x, y, z, i, nx, y, nz);
+          return true;
+        }
       }
     }
     // Level out: spread sideways only over SOLID ground (never slosh across
@@ -336,15 +428,24 @@ export class Simulation {
         return true;
       }
     }
-    // Lonely droplets: a stranded single cell of water in a dip soaks into
-    // the ground or evaporates instead of sitting around like a blue pebble.
-    // Crucially, lonely cells never settle — they stay awake until gone.
-    const hasWaterNeighbor =
-      g.get(x + 1, y, z) === Cell.WATER || g.get(x - 1, y, z) === Cell.WATER ||
-      g.get(x, y, z + 1) === Cell.WATER || g.get(x, y, z - 1) === Cell.WATER ||
+    // Stranded films and lonely droplets: thin ragged water (a single cell,
+    // or the 1-neighbor tail of a film smeared across a slope) soaks into
+    // the ground or evaporates instead of sitting around as blue specks.
+    // Crucially, these cells never settle — they stay awake until gone, and
+    // ponds erode their ragged rims until the waterline reads smooth.
+    const sideWater =
+      (g.get(x + 1, y, z) === Cell.WATER ? 1 : 0) +
+      (g.get(x - 1, y, z) === Cell.WATER ? 1 : 0) +
+      (g.get(x, y, z + 1) === Cell.WATER ? 1 : 0) +
+      (g.get(x, y, z - 1) === Cell.WATER ? 1 : 0);
+    const vertWater =
       g.get(x, y + 1, z) === Cell.WATER || (y > 0 && g.get(x, y - 1, z) === Cell.WATER);
-    if (!hasWaterNeighbor) {
-      if (Math.random() < 0.06) {
+    if (!vertWater && sideWater <= 1) {
+      // Films seep away faster on gravel — it's the drainage layer — but a
+      // connected pond sheet (2+ side neighbors) is never drained by this.
+      const onGravel = y > 0 && g.get(x, y - 1, z) === Cell.GRAVEL;
+      const fade = (sideWater === 0 ? 0.06 : 0.035) * (onGravel ? 2.5 : 1);
+      if (Math.random() < fade) {
         if (y > 0) {
           const bi = g.idx(x, y - 1, z);
           const bt = g.type[bi] as Cell;
@@ -428,9 +529,6 @@ export class Simulation {
       // Drink: species differ in thirst — succulents shrug off droughts.
       // Paced for real-time watching: a thirsty fern wilts after ~2 dry
       // minutes and has ~2 more before it's gone.
-      const THIRST: Record<Species, number> = {
-        succulent: 0.03, grass: 0.11, flower: 0.15, fern: 0.16, mushroom: 0.18,
-      };
       const drank = this.drink(plant);
       if (drank) {
         plant.health = Math.min(100, plant.health + 1.2);
@@ -472,9 +570,9 @@ export class Simulation {
   private drink(plant: Plant): boolean {
     const g = this.grid;
     let bestI = -1, bestWet = 0;
-    for (let dy = -3; dy <= 0; dy++) {
-      for (let dz = -2; dz <= 2; dz++) {
-        for (let dx = -2; dx <= 2; dx++) {
+    for (let dy = -4; dy <= 0; dy++) {
+      for (let dz = -3; dz <= 3; dz++) {
+        for (let dx = -3; dx <= 3; dx++) {
           const x = plant.x + dx, y = plant.y + dy, z = plant.z + dz;
           if (!g.inBounds(x, y, z)) continue;
           const i = g.idx(x, y, z);
@@ -535,29 +633,166 @@ export class Simulation {
   }
 
   private trySpread(plant: Plant): void {
-    const chance: Record<Species, number> = {
-      grass: 0.002, flower: 0.0012, fern: 0.0009, mushroom: 0.0015, succulent: 0.0005,
-    };
-    if (Math.random() > chance[plant.species]) return;
+    if (Math.random() > SPREAD_CHANCE[plant.species]) return;
+    this.spreadOnce(plant);
+  }
+
+  // Attempt one reseed near a parent; returns true if a seedling landed.
+  private spreadOnce(plant: Plant): boolean {
     const g = this.grid;
     const ang = Math.random() * Math.PI * 2;
-    const dist = 5 + Math.random() * 8;
+    const dist = 8 + Math.random() * 12;
     const x = Math.round(plant.x + Math.cos(ang) * dist);
     const z = Math.round(plant.z + Math.sin(ang) * dist);
-    if (x < 2 || x >= W - 2 || z < 2 || z >= D - 2) return;
+    if (x < 3 || x >= W - 3 || z < 3 || z >= D - 3) return false;
     const top = g.top(x, z);
-    if (top < 0 || top >= H - 6) return;
+    if (top < 0 || top >= H - 6) return false;
     const ti = g.idx(x, top, z);
     const tt = g.type[ti] as Cell;
-    if (tt === Cell.WATER) return;
+    if (tt === Cell.WATER) return false;
     const needsSoil = plant.species !== 'mushroom';
-    if (needsSoil && tt !== Cell.SOIL && tt !== Cell.SAND) return;
-    if (g.wet[ti] < 24 && plant.species !== 'succulent') return; // seeds need damp ground
+    if (needsSoil && tt !== Cell.SOIL && tt !== Cell.SAND) return false;
+    if (g.wet[ti] < 24 && plant.species !== 'succulent') return false; // seeds need damp ground
     for (const other of this.plants) {
-      if (Math.abs(other.x - x) + Math.abs(other.z - z) < 6) return;
+      if (Math.abs(other.x - x) + Math.abs(other.z - z) < 9) return false;
     }
     this.addPlant(plant.species, x, top + 1, z, 0.06);
     this.events.push(`A ${plant.species} seedling sprouted \u{1F331}`);
+    return true;
+  }
+
+  // ---- away-time fast-forward ----
+
+  // Coarse, closed-form evolution for time spent away from the tab. It is
+  // deliberately gentler than the live sim — coming back to a graveyard
+  // kills the hobby — but a tank left with no water for days will still
+  // lose its thirstiest plants, and a healthy one will have visibly grown.
+  fastForward(seconds: number): AwaySummary {
+    const g = this.grid;
+    const capped = Math.min(seconds, 72 * 3600);
+    const ticks = capped / 0.5; // growth-tick equivalents
+    const summary: AwaySummary = {
+      seconds, matured: 0, sprouted: 0, wilted: 0, died: 0,
+      composted: 0, mossGrown: 0, pondShrank: false,
+    };
+
+    let waterCells = 0;
+    for (let i = 0; i < g.type.length; i++) if (g.type[i] === Cell.WATER) waterCells++;
+    const hasPond = waterCells > 40;
+
+    for (let p = this.plants.length - 1; p >= 0; p--) {
+      const plant = this.plants[p];
+      if (plant.look === 2) {
+        plant.decayT -= capped;
+        if (plant.decayT <= 0) {
+          this.compost(plant, p);
+          summary.composted++;
+        }
+        continue;
+      }
+
+      const supply = this.supplyAt(plant);
+      const wasMature = plant.stage >= 1;
+      if (supply > 0.45) {
+        plant.health = Math.min(100, plant.health + 25);
+        if (plant.look === 1 && plant.health > 60) plant.look = 0;
+        plant.stage = Math.min(1, plant.stage + 0.0008 * ticks);
+      } else {
+        const drain = THIRST[plant.species] * ticks * (hasPond ? 0.05 : 0.15);
+        plant.health -= Math.min(hasPond ? 55 : 130, drain);
+        plant.stage = Math.min(1, plant.stage + 0.0008 * ticks * supply);
+      }
+
+      if (plant.health <= 0) {
+        plant.look = 2;
+        plant.decayT = 120;
+        summary.died++;
+      } else if (plant.look === 0 && plant.health < 42) {
+        plant.look = 1;
+        summary.wilted++;
+      }
+      if (!wasMature && plant.stage >= 1) summary.matured++;
+    }
+
+    // Reseeding: healthy mature plants quietly multiplied while you were out.
+    let seedBudget = Math.min(6, MAX_PLANTS - this.plants.length);
+    for (const parent of this.plants.slice()) {
+      if (seedBudget <= 0) break;
+      if (parent.look !== 0 || parent.stage < 1) continue;
+      const odds = Math.min(0.75, SPREAD_CHANCE[parent.species] * ticks * 0.05);
+      if (Math.random() < odds && this.spreadOnce(parent)) {
+        seedBudget--;
+        summary.sprouted++;
+      }
+    }
+
+    // Moss creep: reuse the CA step on random existing moss cells.
+    if (this.humidity > 50) {
+      const mossIdx: number[] = [];
+      for (let i = 0; i < g.type.length; i++) if (g.type[i] === Cell.MOSS) mossIdx.push(i);
+      if (mossIdx.length > 0) {
+        const before = mossIdx.length;
+        const attempts = Math.min(1500, ticks * 0.15) | 0;
+        for (let a = 0; a < attempts; a++) {
+          this.stepMoss(mossIdx[(Math.random() * mossIdx.length) | 0]);
+        }
+        summary.mossGrown = Math.max(0, this.mossCells() - before);
+      }
+    }
+
+    // The pond evaporated a little; the moisture went back into the soil
+    // (condensation kept running while you were away).
+    if (waterCells > 0) {
+      const frac = Math.min(0.3, (capped / 86400) * 0.25);
+      let quota = (waterCells * frac) | 0;
+      const removed = quota;
+      const WD = W * D;
+      for (let i = g.type.length - 1; i >= 0 && quota > 0; i--) {
+        if (g.type[i] !== Cell.WATER) continue;
+        const above = i + WD;
+        if (above < g.type.length && g.type[above] !== Cell.EMPTY) continue;
+        g.type[i] = Cell.EMPTY;
+        g.shade[i] = 0;
+        g.flags[i] = 0;
+        quota--;
+      }
+      summary.pondShrank = removed > waterCells * 0.04;
+      for (let k = 0; k < removed; k++) {
+        const x = 1 + ((Math.random() * (W - 2)) | 0);
+        const z = 1 + ((Math.random() * (D - 2)) | 0);
+        const top = g.top(x, z);
+        if (top < 0) continue;
+        const i = g.idx(x, top, z);
+        const t = g.type[i] as Cell;
+        if (t === Cell.SOIL || t === Cell.SAND) g.wet[i] = Math.min(255, g.wet[i] + 40);
+      }
+      this.humidity = Math.min(78, Math.max(55, this.humidity));
+    } else {
+      this.humidity = Math.max(20, this.humidity - (capped / 3600) * 5);
+    }
+
+    this.mossCount = -1;
+    this.changed = true;
+    return summary;
+  }
+
+  // Non-consuming version of drink(): how well-supplied is this plant, 0..1.
+  private supplyAt(plant: Plant): number {
+    const g = this.grid;
+    let bestWet = 0;
+    for (let dy = -4; dy <= 0; dy++) {
+      for (let dz = -3; dz <= 3; dz++) {
+        for (let dx = -3; dx <= 3; dx++) {
+          const x = plant.x + dx, y = plant.y + dy, z = plant.z + dz;
+          if (!g.inBounds(x, y, z)) continue;
+          const i = g.idx(x, y, z);
+          const t = g.type[i] as Cell;
+          if (t === Cell.WATER) return 1;
+          if ((t === Cell.SOIL || t === Cell.SAND) && g.wet[i] > bestWet) bestWet = g.wet[i];
+        }
+      }
+    }
+    return Math.min(1, bestWet / 110);
   }
 
   // Uproot any plant whose anchor falls inside the erase sphere.

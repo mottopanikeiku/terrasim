@@ -264,8 +264,8 @@ export class Room {
 
     // Plant labels staked into the soil inside the tank (they ride the
     // terrain as it shifts).
-    this.plantLabel(scene, 13, 16);
-    this.plantLabel(scene, 82, 12);
+    this.plantLabel(scene, 20, 24);
+    this.plantLabel(scene, 123, 18);
 
     // The drip that falls from the watering can spout once in a while.
     this.drip = new THREE.Mesh(
