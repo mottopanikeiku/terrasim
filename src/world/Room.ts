@@ -1,8 +1,11 @@
 import * as THREE from 'three';
+import { V, cellToWorld } from '../core/constants';
+import { Grid } from '../core/Grid';
 
-// The cozy room around the tank: a wallpapered back wall, a few cute framed
-// prints (butterfly, mushroom, fern), and little desk props — so the
-// terrarium feels like it lives on someone's table.
+// The cozy room around the tank: a plaster wall, framed prints, and little
+// desk props — plus the tiny details that sell a miniature world: a snail
+// shell by the books, hand-written plant labels in the soil, a watering can
+// that drips now and then.
 
 type Draw = (ctx: CanvasRenderingContext2D, w: number, h: number) => void;
 
@@ -127,7 +130,15 @@ const drawFern: Draw = (ctx, w, h) => {
 };
 
 export class Room {
-  constructor(scene: THREE.Scene) {
+  private drip: THREE.Mesh;
+  private dripT = 4;
+  private dripY = 0;
+  private dripFalling = false;
+  private labels: { group: THREE.Group; gx: number; gz: number }[] = [];
+  private grid?: Grid;
+
+  constructor(scene: THREE.Scene, grid?: Grid) {
+    this.grid = grid;
     // Quiet warm plaster wall, darker toward the edges so the lit tank is
     // the unambiguous subject — busy wallpaper patterns read cheap.
     const wallTex = canvasTexture(1024, 512, (ctx, w, h) => {
@@ -167,6 +178,169 @@ export class Room {
     // Desk props: a copper watering can and a stack of well-read books.
     this.wateringCan(scene, -16.5, 0, 6);
     this.bookStack(scene, 17.5, 0, -5.5);
+
+    // --- the tiny details ---
+
+    // An empty snail shell resting beside the books.
+    const shellBig = new THREE.MeshStandardMaterial({ color: 0x9a6a40, roughness: 0.45 });
+    const shellDark = new THREE.MeshStandardMaterial({ color: 0x755030, roughness: 0.45 });
+    const shell = new THREE.Group();
+    const coil = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.26, 9, 20), shellBig);
+    const coil2 = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.15, 8, 14), shellDark);
+    const coreS = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), shellBig);
+    shell.add(coil, coil2, coreS);
+    shell.rotation.x = Math.PI / 2 - 0.25; // lying on its side
+    shell.position.set(14.6, 0.45, -2.8);
+    shell.traverse((o) => { o.castShadow = true; });
+    scene.add(shell);
+
+    // A pencil resting on top of the book stack.
+    const pencil = new THREE.Group();
+    const shaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.09, 0.09, 2.4, 6),
+      new THREE.MeshStandardMaterial({ color: 0xd9a13c, roughness: 0.6 })
+    );
+    shaft.rotation.z = Math.PI / 2;
+    const tip = new THREE.Mesh(
+      new THREE.ConeGeometry(0.09, 0.3, 6),
+      new THREE.MeshStandardMaterial({ color: 0xe8d8b8, roughness: 0.7 })
+    );
+    tip.rotation.z = -Math.PI / 2;
+    tip.position.x = 1.35;
+    const lead = new THREE.Mesh(
+      new THREE.ConeGeometry(0.035, 0.12, 6),
+      new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.5 })
+    );
+    lead.rotation.z = -Math.PI / 2;
+    lead.position.x = 1.52;
+    pencil.add(shaft, tip, lead);
+    pencil.position.set(17.3, 1.78, -5.2);
+    pencil.rotation.y = 0.4;
+    pencil.traverse((o) => { o.castShadow = true; });
+    scene.add(pencil);
+
+    // A hand-written card leaning against the front glass.
+    const card = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.6, 1.7),
+      new THREE.MeshStandardMaterial({
+        map: canvasTexture(256, 168, (ctx, w, h) => {
+          ctx.fillStyle = '#f4ecd8';
+          ctx.fillRect(0, 0, w, h);
+          ctx.strokeStyle = '#b8a888';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(5, 5, w - 10, h - 10);
+          ctx.strokeStyle = '#5a4a38';
+          ctx.lineWidth = 4;
+          ctx.lineCap = 'round';
+          // wobbly handwriting squiggles
+          for (const [y0, x0, x1] of [[58, 36, 218], [96, 36, 190], [134, 70, 180]] as const) {
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            for (let x = x0; x <= x1; x += 9) {
+              ctx.lineTo(x, y0 + Math.sin(x * 0.32) * 5 + (Math.random() - 0.5) * 3);
+            }
+            ctx.stroke();
+          }
+          // a tiny heart at the end
+          ctx.fillStyle = '#c96a6a';
+          ctx.beginPath();
+          ctx.arc(196, 130, 5, 0, Math.PI * 2);
+          ctx.arc(205, 130, 5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(191, 133);
+          ctx.lineTo(200.5, 144);
+          ctx.lineTo(210, 133);
+          ctx.fill();
+        }),
+        roughness: 0.85,
+      })
+    );
+    card.position.set(-9.5, 0.85, 5.85);
+    card.rotation.x = -0.32; // leaning back against the glass
+    card.castShadow = true;
+    scene.add(card);
+
+    // Plant labels staked into the soil inside the tank (they ride the
+    // terrain as it shifts).
+    this.plantLabel(scene, 13, 16);
+    this.plantLabel(scene, 82, 12);
+
+    // The drip that falls from the watering can spout once in a while.
+    this.drip = new THREE.Mesh(
+      new THREE.SphereGeometry(0.09, 8, 6),
+      new THREE.MeshPhysicalMaterial({ color: 0x9fd0ea, roughness: 0.1, transparent: true, opacity: 0.85 })
+    );
+    this.drip.visible = false;
+    scene.add(this.drip);
+  }
+
+  private plantLabel(scene: THREE.Scene, gx: number, gz: number): void {
+    const group = new THREE.Group();
+    const stake = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.7, 0.018),
+      new THREE.MeshStandardMaterial({ color: 0xb08c5c, roughness: 0.8 })
+    );
+    stake.position.y = 0.35;
+    const tag = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.5, 0.3),
+      new THREE.MeshStandardMaterial({
+        map: canvasTexture(96, 56, (ctx, w, h) => {
+          ctx.fillStyle = '#f2e9d4';
+          ctx.fillRect(0, 0, w, h);
+          ctx.strokeStyle = '#6a5a44';
+          ctx.lineWidth = 2.5;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(12, 30);
+          for (let x = 12; x <= 80; x += 6) {
+            ctx.lineTo(x, 30 + Math.sin(x * 0.4) * 4 + (Math.random() - 0.5) * 2);
+          }
+          ctx.stroke();
+        }),
+        roughness: 0.9,
+        side: THREE.DoubleSide,
+      })
+    );
+    tag.position.y = 0.62;
+    group.add(stake, tag);
+    group.rotation.y = -0.35 + Math.random() * 0.7;
+    group.traverse((o) => { o.castShadow = true; });
+    scene.add(group);
+    this.labels.push({ group, gx, gz });
+  }
+
+  // Animates the watering-can drip and keeps soil labels riding the terrain.
+  update(dt: number): void {
+    if (this.grid) {
+      for (const l of this.labels) {
+        const top = this.grid.top(l.gx, l.gz);
+        const [wx, , wz] = cellToWorld(l.gx, 0, l.gz);
+        l.group.position.set(wx, Math.max(0, (top + 1)) * V - 0.1, wz);
+      }
+    }
+
+    if (this.dripFalling) {
+      this.dripY -= 6 * dt;
+      if (this.dripY <= 0.06) {
+        this.dripFalling = false;
+        this.drip.visible = false;
+        this.dripT = 6 + Math.random() * 9;
+      } else {
+        this.drip.position.y = this.dripY;
+        this.drip.scale.y = 1.4; // stretched as it falls
+      }
+    } else {
+      this.dripT -= dt;
+      if (this.dripT <= 0) {
+        // Spout tip of the watering can (matches wateringCan placement).
+        this.drip.position.set(-16.5 + Math.cos(0.5) * -2.55, 2.2, 6 + Math.sin(-0.5) * -2.55);
+        this.dripY = 2.2;
+        this.drip.scale.set(1, 1, 1);
+        this.drip.visible = true;
+        this.dripFalling = true;
+      }
+    }
   }
 
   private hangPoster(scene: THREE.Scene, draw: Draw, x: number, y: number, w: number, h: number, tilt: number): void {

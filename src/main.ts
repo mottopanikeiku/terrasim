@@ -19,9 +19,9 @@ function init(): void {
 
   const sceneMgr = new SceneManager(app);
   new Aquarium(sceneMgr.scene);
-  new Room(sceneMgr.scene);
 
   const grid = new Grid();
+  const room = new Room(sceneMgr.scene, grid);
   const sim = new Simulation(grid);
   const voxels = new VoxelRenderer(sceneMgr.scene, grid);
   const plantRenderer = new PlantRenderer(sceneMgr.scene, sim);
@@ -103,6 +103,7 @@ function init(): void {
     plantRenderer.update(rawDt, time);
     critters.update(rawDt, time, sceneMgr.currentPreset === 'night');
     condensation.update(rawDt, sim.humidity);
+    room.update(rawDt);
     sceneMgr.update(rawDt);
 
     statsAccum += rawDt;
