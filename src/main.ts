@@ -8,6 +8,7 @@ import { Room } from './world/Room';
 import { Critters } from './world/Critters';
 import { Condensation } from './world/Condensation';
 import { PlantRenderer } from './world/PlantRenderer';
+import { WaterSurface } from './world/WaterSurface';
 import { buildDefaultScene } from './world/DefaultScene';
 import { UI } from './ui/UI';
 import { save, load, clearSave } from './core/Storage';
@@ -25,6 +26,7 @@ function init(): void {
   const room = new Room(sceneMgr.scene, grid);
   const sim = new Simulation(grid);
   const voxels = new VoxelRenderer(sceneMgr.scene, grid);
+  const water = new WaterSurface(sceneMgr.scene);
   const plantRenderer = new PlantRenderer(sceneMgr.scene, sim);
   const critters = new Critters(sceneMgr.scene, grid, sim);
   const condensation = new Condensation(sceneMgr.scene);
@@ -37,7 +39,7 @@ function init(): void {
   const input = new Input(sceneMgr.renderer.domElement, sceneMgr.camera, grid, sim, sceneMgr.scene);
 
   // Debug handle for development tooling.
-  (window as any).__terra = { grid, sim, sceneMgr, critters, plantRenderer, voxels };
+  (window as any).__terra = { grid, sim, sceneMgr, critters, plantRenderer, voxels, water };
 
   const ui = new UI();
   let speed = 1;
@@ -103,6 +105,7 @@ function init(): void {
 
     if (sim.changed) {
       voxels.rebuild();
+      water.rebuild(grid);
       sim.changed = false;
       dirty = true;
     }
