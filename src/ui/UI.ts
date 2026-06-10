@@ -45,6 +45,8 @@ export class UI {
   private hintEl: HTMLElement;
   private toastEl: HTMLElement;
   private statsEl: HTMLElement;
+  private alertsEl!: HTMLElement;
+  private guideEl!: HTMLElement;
   private hintTimer = 0;
   private toastQueue: string[] = [];
   private toastBusy = false;
@@ -57,6 +59,7 @@ export class UI {
     root.innerHTML = `
       <div id="brand"><h1>Terrarium</h1><span>pour &middot; plant &middot; grow</span></div>
       <div id="stats"></div>
+      <div id="alerts"></div>
       <div id="topbar">
         <div class="seg" id="presets"></div>
         <div class="seg" id="actions"></div>
@@ -70,6 +73,8 @@ export class UI {
     this.hintEl = root.querySelector('#hint')!;
     this.toastEl = root.querySelector('#toast')!;
     this.statsEl = root.querySelector('#stats')!;
+    this.alertsEl = root.querySelector('#alerts')!;
+    this.buildGuide();
 
     const toolbar = root.querySelector('#toolbar')!;
     const addGroup = (title: string, tools: ToolDef[]) => {
@@ -136,6 +141,13 @@ export class UI {
     });
     actions.appendChild(speedBtn);
 
+    const guide = document.createElement('button');
+    guide.className = 'chip';
+    guide.title = 'How terrariums work';
+    guide.textContent = '\u{1F4D6}';
+    guide.addEventListener('click', () => this.guideEl.classList.toggle('open'));
+    actions.appendChild(guide);
+
     const photo = document.createElement('button');
     photo.className = 'chip';
     photo.title = 'Save a photo';
@@ -198,5 +210,82 @@ export class UI {
       `<span title="Standing water">\u{1F30A} ${s.water}</span>` +
       `<span title="Living plants">\u{1F33F} ${s.plants}</span>` +
       `<span title="Ecosystem mood">${mood}</span>`;
+  }
+
+  updateAlerts(alerts: string[]): void {
+    this.alertsEl.innerHTML = alerts
+      .map((a) => `<div class="alert">${a}</div>`)
+      .join('');
+  }
+
+  private buildGuide(): void {
+    this.guideEl = document.createElement('div');
+    this.guideEl.id = 'guide';
+    this.guideEl.innerHTML = `
+      <div id="guide-card">
+        <button id="guide-close" title="Close">&times;</button>
+        <h2>\u{1F331} How your terrarium works</h2>
+        <p>A terrarium is a tiny world behind glass. Done right, it needs
+        almost nothing from you — the same water cycles around and around,
+        and the plants, soil and bugs keep each other in balance. This one
+        works the same way real ones do.</p>
+
+        <h3>\u{1FAA8} The layers</h3>
+        <p><b>Gravel</b> at the bottom is drainage — extra water collects
+        there instead of drowning roots. <b>Sand</b> keeps the soil out of
+        the drainage. <b>Soil</b> on top is where everything grows. Pour
+        them in that order when you build.</p>
+
+        <h3>\u{1F4A7} The water cycle</h3>
+        <p>Open water slowly <b>evaporates</b> and raises the humidity
+        (\u{1F4A7} in the corner). Humid air <b>condenses</b> on the glass —
+        watch for droplets running down — and trickles back into the soil at
+        the edges. Plants drink from damp soil (it looks darker), and water
+        sinks deeper over time. Nothing is lost; it just keeps moving.</p>
+
+        <h3>\u{1F33F} The plants</h3>
+        <p>Plants drink the moisture near their roots and grow slowly — in
+        real time. A seedling takes a good while to mature, so check back on
+        it like you would a real one (or use the speed toggle). Thirsty
+        plants <b>turn yellow and droop</b>. Water them and they recover.
+        Ignore them and they die, fall over, and <b>compost back into fresh
+        soil</b>. Healthy mature plants quietly seed new sprouts nearby.</p>
+        <p>Each species has a personality: <b>succulents</b> barely drink and
+        love the dry corner, <b>ferns and mushrooms</b> want it damp,
+        <b>grass</b> is easy-going, <b>moss</b> creeps slowly over any moist
+        surface — it's your humidity indicator. If the moss retreats, the
+        tank is too dry.</p>
+
+        <h3>\u{1F41B} The cleanup crew</h3>
+        <p>The little isopods wandering around are decomposers — real
+        terrarium keepers add them on purpose. They find dead plants and
+        nibble them away, returning nutrients to the soil faster.</p>
+
+        <h3>\u{267B}\u{FE0F} Making it self-sustaining</h3>
+        <p>The goal: a tank you could walk away from. The checklist —</p>
+        <p>\u{2022} Keep <b>some standing water</b> (a pond corner) so the
+        cycle has a source.<br/>
+        \u{2022} Aim for <b>humidity between 55% and 80%</b> — condensation
+        on the glass is a good sign, not a problem.<br/>
+        \u{2022} Mix <b>thirsty and hardy species</b> across wet and dry
+        zones.<br/>
+        \u{2022} Let dead plants compost — that's the nutrient loop, not a
+        mess.<br/>
+        \u{2022} Watch the mood (\u{1F331} = thriving). Alerts appear under
+        the stats when something needs you.</p>
+
+        <h3>\u{1F5B1}\u{FE0F} Controls</h3>
+        <p>Hold <b>left mouse</b> to pour or erase \u{2022} <b>click</b> to
+        plant \u{2022} <b>right-drag</b> to orbit \u{2022} <b>scroll</b> to
+        zoom \u{2022} on touch: drag to orbit, tap to act.</p>
+      </div>
+    `;
+    document.body.appendChild(this.guideEl);
+    this.guideEl.querySelector('#guide-close')!.addEventListener('click', () => {
+      this.guideEl.classList.remove('open');
+    });
+    this.guideEl.addEventListener('click', (e) => {
+      if (e.target === this.guideEl) this.guideEl.classList.remove('open');
+    });
   }
 }

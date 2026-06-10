@@ -78,6 +78,68 @@
 
       .chip.wide { width: auto; padding: 0 12px; font-size: 0.9rem; font-weight: 600; }
 
+      #alerts {
+        position: fixed; top: 122px; left: 22px; z-index: 10;
+        display: flex; flex-direction: column; gap: 6px;
+        max-width: 320px;
+      }
+      .alert {
+        padding: 8px 14px;
+        background: rgba(74, 50, 16, 0.72);
+        border: 1px solid rgba(255, 196, 110, 0.45);
+        border-radius: 12px;
+        font-size: 0.8rem; color: #ffe2b8;
+        backdrop-filter: blur(10px);
+        animation: alertIn 0.4s ease;
+      }
+      @keyframes alertIn {
+        from { opacity: 0; transform: translateX(-10px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+
+      #guide {
+        position: fixed; inset: 0; z-index: 50;
+        display: none;
+        align-items: center; justify-content: center;
+        background: rgba(16, 11, 6, 0.55);
+        backdrop-filter: blur(4px);
+      }
+      #guide.open { display: flex; }
+      #guide-card {
+        position: relative;
+        width: min(560px, calc(100vw - 40px));
+        max-height: min(78vh, 700px);
+        overflow-y: auto;
+        padding: 30px 34px;
+        background: rgba(42, 33, 22, 0.92);
+        border: 1px solid rgba(255, 235, 195, 0.18);
+        border-radius: 20px;
+        backdrop-filter: blur(16px);
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+      }
+      #guide-card h2 {
+        font-family: 'Fraunces', serif; font-weight: 500;
+        font-size: 1.45rem; color: #f3e6c8; margin-bottom: 0.7rem;
+      }
+      #guide-card h3 {
+        font-family: 'Fraunces', serif; font-weight: 500;
+        font-size: 1.05rem; color: #e8cf9e; margin: 1.2rem 0 0.35rem;
+      }
+      #guide-card p {
+        font-size: 0.86rem; line-height: 1.55; color: rgba(240, 230, 210, 0.88);
+        margin-bottom: 0.4rem;
+      }
+      #guide-card b { color: #f5e7c6; }
+      #guide-close {
+        position: absolute; top: 14px; right: 16px;
+        width: 34px; height: 34px;
+        border: none; border-radius: 50%;
+        background: rgba(255, 235, 195, 0.1);
+        color: #f0e0c0; font-size: 1.3rem; line-height: 1;
+        cursor: pointer;
+      }
+      #guide-close:hover { background: rgba(255, 235, 195, 0.22); }
+
       #topbar {
         position: fixed; top: 18px; right: 18px; z-index: 10;
         display: flex; gap: 10px;
