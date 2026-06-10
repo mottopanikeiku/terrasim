@@ -9,8 +9,8 @@ import { Cell, Grid } from '../core/Grid';
 
 const MAX_QUADS = 90000;
 
-const SHALLOW = new THREE.Color(0x86c8e8).convertSRGBToLinear();
-const DEEP = new THREE.Color(0x3e88b8).convertSRGBToLinear();
+const SHALLOW = new THREE.Color(0xa3d8ef).convertSRGBToLinear();
+const DEEP = new THREE.Color(0x5fa8d4).convertSRGBToLinear();
 
 export class WaterSurface {
   private mesh: THREE.Mesh;
@@ -29,15 +29,17 @@ export class WaterSurface {
     this.geo.setAttribute('color', new THREE.BufferAttribute(this.col, 3).setUsage(THREE.DynamicDrawUsage));
     this.geo.setIndex(new THREE.BufferAttribute(this.idx, 1));
 
+    // FrontSide + depthWrite: only the nearest water surface is visible, so
+    // pools read as one clean sheet instead of layered transparency murk.
     const mat = new THREE.MeshPhysicalMaterial({
       vertexColors: true,
       transparent: true,
-      opacity: 0.6,
-      roughness: 0.05,
+      opacity: 0.8,
+      roughness: 0.12,
       metalness: 0,
-      envMapIntensity: 1.4,
-      depthWrite: false,
-      side: THREE.DoubleSide,
+      envMapIntensity: 1.1,
+      depthWrite: true,
+      side: THREE.FrontSide,
     });
     this.mesh = new THREE.Mesh(this.geo, mat);
     this.mesh.frustumCulled = false;

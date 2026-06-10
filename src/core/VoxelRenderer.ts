@@ -10,14 +10,14 @@ const MAX_TUFT = 30000;
 // 24 precomputed jittered orientations (rotation+scale baked into a 3x3),
 // picked per-cell by position hash, so grains look like tumbled crumbs and
 // pebbles instead of aligned blocks — without per-instance math at rebuild.
-function makeJitterBasis(count: number, maxAngle: number, sMin: number, sMax: number): Float32Array[] {
+function makeJitterBasis(count: number, maxAngle: number, yMax: number, sMin: number, sMax: number): Float32Array[] {
   const out: Float32Array[] = [];
   const e = new THREE.Euler();
   const m = new THREE.Matrix4();
   for (let i = 0; i < count; i++) {
     e.set(
       (Math.random() - 0.5) * 2 * maxAngle,
-      Math.random() * Math.PI,
+      (Math.random() - 0.5) * 2 * yMax,
       (Math.random() - 0.5) * 2 * maxAngle
     );
     m.makeRotationFromEuler(e);
@@ -51,11 +51,11 @@ export class VoxelRenderer {
   private fine: THREE.InstancedMesh;
   private pebble: THREE.InstancedMesh;
   private tuft: THREE.InstancedMesh;
-  // Gentle jitter for fine grains (heavy rotation made surfaces look noisy),
-  // chunky jitter for pebbles, soft for moss cushions.
-  private fineJitter = makeJitterBasis(24, 0.07, 1.02, 1.1);
-  private pebbleJitter = makeJitterBasis(24, 0.6, 0.92, 1.25);
-  private tuftJitter = makeJitterBasis(24, 0.15, 0.95, 1.2);
+  // Gentle jitter for fine grains — cubes must stay nearly axis-aligned or
+  // their corner-on silhouettes read as zigzag noise. Pebbles tumble freely.
+  private fineJitter = makeJitterBasis(24, 0.06, 0.1, 1.02, 1.08);
+  private pebbleJitter = makeJitterBasis(24, 0.6, Math.PI, 0.92, 1.25);
+  private tuftJitter = makeJitterBasis(24, 0.15, Math.PI, 0.95, 1.2);
   private tmpColor = new THREE.Color();
 
   constructor(scene: THREE.Scene, private grid: Grid) {
