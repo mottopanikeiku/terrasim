@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { cellToWorld } from '../core/constants';
-import { Simulation } from '../core/Simulation';
+import { W, D, V } from '../core/constants';
+import { World } from '../core/World';
 import { buildPlantGeometry } from './PlantMeshes';
 import { Plant } from './Plants';
 
@@ -23,10 +23,10 @@ const TINT_DEAD = new THREE.Color(0.55, 0.4, 0.26);
 export class PlantRenderer {
   private visuals = new Map<number, Visual>();
 
-  constructor(private scene: THREE.Scene, private sim: Simulation) {}
+  constructor(private scene: THREE.Scene, private world: World) {}
 
   update(dt: number, time: number): void {
-    const plants = this.sim.getPlants();
+    const plants = this.world.getPlants();
     const seen = new Set<number>();
 
     for (const p of plants) {
@@ -36,6 +36,9 @@ export class PlantRenderer {
         v = this.create(p);
         this.visuals.set(p.id, v);
       }
+
+      // Ride the terrain as it settles or buries the base.
+      v.mesh.position.y = this.world.groundWorldY(p.x, p.z) - 0.12;
 
       // Smoothly approach the simulated growth stage.
       v.displayStage += (p.stage - v.displayStage) * Math.min(1, dt * 1.5);
@@ -80,8 +83,11 @@ export class PlantRenderer {
       envMapIntensity: 0.4,
     });
     const mesh = new THREE.Mesh(geo, mat);
-    const [wx, wy, wz] = cellToWorld(p.x, p.y, p.z);
-    mesh.position.set(wx, wy - 0.12, wz); // base slightly into the soil
+    mesh.position.set(
+      (p.x - W / 2 + 0.5) * V,
+      this.world.groundWorldY(p.x, p.z) - 0.12, // base slightly into the soil
+      (p.z - D / 2 + 0.5) * V
+    );
     mesh.castShadow = true;
     this.scene.add(mesh);
     return {

@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { W, D, V, cellToWorld } from '../core/constants';
-import { Cell, Grid } from '../core/Grid';
-import { Simulation } from '../core/Simulation';
+import { World } from '../core/World';
 
 // The inhabitants. Each one has a tiny behavior loop tuned for charm:
 // - isopods (the cleanup crew) trundle around, seek out dead plants to
@@ -11,37 +10,24 @@ import { Simulation } from '../core/Simulation';
 // - butterflies flutter between open flowers by day and rest at night
 // - fireflies drift as soft glows after dark
 
-function surfaceWorldY(grid: Grid, gx: number, gz: number): number {
-  let top = grid.top(gx, gz);
-  if (top < 0) top = 0;
-  return (top + 1) * V;
+// Smooth ground height at a fractional column position — keeps walkers
+// from clipping into slopes.
+function groundWorldY(world: World, px: number, pz: number): number {
+  return world.groundWorldYf(px - 0.5, pz - 0.5);
 }
 
-// Smooth ground height at a fractional grid position (bilinear over the
-// four surrounding columns) — keeps walkers from clipping into slopes.
-function groundWorldY(grid: Grid, px: number, pz: number): number {
-  const x0 = Math.floor(px - 0.5), z0 = Math.floor(pz - 0.5);
-  const fx = px - 0.5 - x0, fz = pz - 0.5 - z0;
-  const h00 = surfaceWorldY(grid, x0, z0);
-  const h10 = surfaceWorldY(grid, x0 + 1, z0);
-  const h01 = surfaceWorldY(grid, x0, z0 + 1);
-  const h11 = surfaceWorldY(grid, x0 + 1, z0 + 1);
-  return (h00 * (1 - fx) + h10 * fx) * (1 - fz) + (h01 * (1 - fx) + h11 * fx) * fz;
-}
-
-function isWaterAt(grid: Grid, gx: number, gz: number): boolean {
-  const top = grid.top(gx, gz);
-  return top >= 0 && grid.get(gx, top, gz) === Cell.WATER;
+function isWaterAt(world: World, gx: number, gz: number): boolean {
+  return world.isWater(gx, gz);
 }
 
 // Pick a wander target on dry land; falls back to staying put.
-function dryTarget(grid: Grid, fromX: number, fromZ: number, minDist: number, maxDist: number): [number, number] {
+function dryTarget(world: World, fromX: number, fromZ: number, minDist: number, maxDist: number): [number, number] {
   for (let attempt = 0; attempt < 8; attempt++) {
     const ang = Math.random() * Math.PI * 2;
     const dist = minDist + Math.random() * (maxDist - minDist);
     const x = Math.min(W - 5, Math.max(4, fromX + Math.cos(ang) * dist));
     const z = Math.min(D - 5, Math.max(4, fromZ + Math.sin(ang) * dist));
-    if (!isWaterAt(grid, Math.round(x), Math.round(z))) return [x, z];
+    if (!isWaterAt(world, Math.round(x), Math.round(z))) return [x, z];
   }
   return [fromX, fromZ];
 }
@@ -73,7 +59,7 @@ class Isopod {
   private speed: number;
   private wobble = Math.random() * 10;
 
-  constructor(scene: THREE.Scene, private grid: Grid, private sim: Simulation) {
+  constructor(scene: THREE.Scene, private world: World) {
     const shellMat = new THREE.MeshStandardMaterial({ color: 0x5d5650, roughness: 0.45 });
     const bodyMat = new THREE.MeshStandardMaterial({ color: 0x474340, roughness: 0.6 });
 
@@ -134,13 +120,13 @@ class Isopod {
       const delta = this.target.clone().sub(this.pos);
       const dist = delta.length();
       if (dist < 0.6) {
-        this.sim.nibbleDeadAt(Math.round(this.pos.x), Math.round(this.pos.y), 3);
+        this.world.nibbleDeadAt(Math.round(this.pos.x), Math.round(this.pos.y), 3);
         this.pause = 0.6 + Math.random() * 2.4;
-        const dead = this.sim.findDeadPlantNear(Math.round(this.pos.x), Math.round(this.pos.y), 40);
-        if (dead && !isWaterAt(this.grid, dead.x, dead.z)) {
+        const dead = this.world.findDeadPlantNear(Math.round(this.pos.x), Math.round(this.pos.y), 40);
+        if (dead && !isWaterAt(this.world, dead.x, dead.z)) {
           this.target.set(dead.x + (Math.random() - 0.5), dead.z + (Math.random() - 0.5));
         } else {
-          const [tx, tz] = dryTarget(this.grid, this.pos.x, this.pos.y, 9, 33);
+          const [tx, tz] = dryTarget(this.world, this.pos.x, this.pos.y, 9, 33);
           this.target.set(tx, tz);
         }
       } else {
@@ -148,8 +134,8 @@ class Isopod {
         // Never wade into a pond: turn around instead.
         const nx = Math.round(this.pos.x + delta.x * 4);
         const nz = Math.round(this.pos.y + delta.y * 4);
-        if (isWaterAt(this.grid, nx, nz)) {
-          const [tx, tz] = dryTarget(this.grid, this.pos.x, this.pos.y, 9, 24);
+        if (isWaterAt(this.world, nx, nz)) {
+          const [tx, tz] = dryTarget(this.world, this.pos.x, this.pos.y, 9, 24);
           this.target.set(tx, tz);
         } else {
           this.pos.add(delta);
@@ -162,7 +148,7 @@ class Isopod {
     const [wx, , wz] = cellToWorld(gx, 0, gz);
     this.group.position.set(
       wx + (this.pos.x - gx) * V,
-      groundWorldY(this.grid, this.pos.x, this.pos.y) + 0.045 + (this.curl > 0 ? 0.02 : Math.sin(this.wobble) * 0.006),
+      groundWorldY(this.world, this.pos.x, this.pos.y) + 0.045 + (this.curl > 0 ? 0.02 : Math.sin(this.wobble) * 0.006),
       wz + (this.pos.y - gz) * V
     );
   }
@@ -176,7 +162,7 @@ class Snail {
   private target: THREE.Vector2;
   private grazeTimer = 20;
 
-  constructor(scene: THREE.Scene, private grid: Grid, private sim: Simulation) {
+  constructor(scene: THREE.Scene, private world: World) {
     const bodyMat = new THREE.MeshStandardMaterial({ color: 0xc8a76a, roughness: 0.55 });
     const shellMat = new THREE.MeshStandardMaterial({ color: 0x8a5a36, roughness: 0.4 });
     const shellMat2 = new THREE.MeshStandardMaterial({ color: 0x6e4628, roughness: 0.4 });
@@ -219,14 +205,14 @@ class Snail {
     const delta = this.target.clone().sub(this.pos);
     const dist = delta.length();
     if (dist < 0.45) {
-      const [tx, tz] = dryTarget(this.grid, this.pos.x, this.pos.y, 7, 25);
+      const [tx, tz] = dryTarget(this.world, this.pos.x, this.pos.y, 7, 25);
       this.target.set(tx, tz);
     } else {
       delta.normalize().multiplyScalar(Math.min(dist, 0.7 * dt)); // gloriously slow
       const nx = Math.round(this.pos.x + delta.x * 4);
       const nz = Math.round(this.pos.y + delta.y * 4);
-      if (isWaterAt(this.grid, nx, nz)) {
-        const [tx, tz] = dryTarget(this.grid, this.pos.x, this.pos.y, 7, 18);
+      if (isWaterAt(this.world, nx, nz)) {
+        const [tx, tz] = dryTarget(this.world, this.pos.x, this.pos.y, 7, 18);
         this.target.set(tx, tz);
       } else {
         this.pos.add(delta);
@@ -238,19 +224,8 @@ class Snail {
     this.grazeTimer -= dt;
     if (this.grazeTimer <= 0) {
       this.grazeTimer = 25 + Math.random() * 25;
-      if (this.sim.mossCells() > 180) {
-        const gx = Math.round(this.pos.x), gz = Math.round(this.pos.y);
-        outer: for (let dx = -3; dx <= 3; dx++) {
-          for (let dz = -3; dz <= 3; dz++) {
-            const x = gx + dx, z = gz + dz;
-            const top = this.grid.top(x, z);
-            if (top > 0 && this.grid.get(x, top, z) === Cell.MOSS) {
-              this.grid.clearCell(x, top, z);
-              this.sim.changed = true;
-              break outer;
-            }
-          }
-        }
+      if (this.world.mossAmount() > 35) {
+        this.world.grazeMossAt(Math.round(this.pos.x), Math.round(this.pos.y), 3);
       }
     }
 
@@ -258,7 +233,7 @@ class Snail {
     const [wx, , wz] = cellToWorld(gx, 0, gz);
     this.group.position.set(
       wx + (this.pos.x - gx) * V,
-      groundWorldY(this.grid, this.pos.x, this.pos.y) + 0.01,
+      groundWorldY(this.world, this.pos.x, this.pos.y) + 0.01,
       wz + (this.pos.y - gz) * V
     );
   }
@@ -276,7 +251,7 @@ class Butterfly {
   private phase = Math.random() * Math.PI * 2;
   private mats: THREE.MeshStandardMaterial[] = [];
 
-  constructor(scene: THREE.Scene, private grid: Grid, private sim: Simulation, color: number) {
+  constructor(scene: THREE.Scene, private world: World, color: number) {
     const wingMat = new THREE.MeshStandardMaterial({
       color, roughness: 0.6, side: THREE.DoubleSide,
     });
@@ -307,12 +282,13 @@ class Butterfly {
   }
 
   private pickFlower(): THREE.Vector3 | null {
-    const flowers = this.sim.getPlants().filter(
+    const flowers = this.world.getPlants().filter(
       (p) => p.species === 'flower' && p.look === 0 && p.stage > 0.6
     );
     if (flowers.length === 0) return null;
     const f = flowers[(Math.random() * flowers.length) | 0];
-    const [wx, wy, wz] = cellToWorld(f.x, f.y, f.z);
+    const [wx, , wz] = cellToWorld(f.x, 0, f.z);
+    const wy = this.world.groundWorldY(f.x, f.z);
     return new THREE.Vector3(wx, wy + 0.65 * f.stage + 0.12, wz);
   }
 
@@ -385,11 +361,11 @@ export class Critters {
   private fireflyPhase: Float32Array;
   private fireflyVisible = 0;
 
-  constructor(scene: THREE.Scene, grid: Grid, sim: Simulation) {
-    for (let n = 0; n < 3; n++) this.isopods.push(new Isopod(scene, grid, sim));
-    this.snail = new Snail(scene, grid, sim);
-    this.butterflies.push(new Butterfly(scene, grid, sim, 0xe2899f));
-    this.butterflies.push(new Butterfly(scene, grid, sim, 0x8fb7dd));
+  constructor(scene: THREE.Scene, world: World) {
+    for (let n = 0; n < 3; n++) this.isopods.push(new Isopod(scene, world));
+    this.snail = new Snail(scene, world);
+    this.butterflies.push(new Butterfly(scene, world, 0xe2899f));
+    this.butterflies.push(new Butterfly(scene, world, 0x8fb7dd));
 
     const n = 14;
     const positions = new Float32Array(n * 3);
