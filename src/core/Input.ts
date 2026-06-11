@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { W, D, V } from './constants';
 import { Mat, World } from './World';
-import { Species, SPECIES_INFO } from '../world/Plants';
+import { Species, SPECIES } from '../world/Plants';
 
 export type ToolId =
   | 'sand' | 'soil' | 'gravel' | 'water'
-  | 'rock' | 'seeds' | 'moss'
+  | 'rock' | 'seeds' | 'moss' | 'litter'
   | Species
   | 'erase';
 
@@ -152,9 +152,16 @@ export class Input {
       return;
     }
 
-    const info = SPECIES_INFO[this.tool as Species];
-    if (!info) return;
-    if (w.water[i] > 0.05) {
+    if (this.tool === 'litter') {
+      w.addLitter(x, z);
+      this.onHint?.('Leaf litter scattered — it keeps the soil under it moist');
+      this.onAction?.();
+      return;
+    }
+
+    const def = SPECIES[this.tool as Species];
+    if (!def) return;
+    if (w.water[i] > 0.05 && !def.waterEdge) {
       this.onHint?.('Too deep — plant on dry ground');
       return;
     }
@@ -163,17 +170,19 @@ export class Input {
       this.onHint?.('Needs solid ground');
       return;
     }
-    if (info.needsSoil && top !== Mat.SOIL && top !== Mat.SAND) {
-      this.onHint?.(`${info.label} needs soil or sand to grow`);
+    if (def.needsSoil && top !== Mat.SOIL && top !== Mat.SAND) {
+      this.onHint?.(`${def.label} needs soil or sand to grow`);
       return;
     }
     w.addPlant(this.tool as Species, x, z, 0.18);
+    this.onHint?.(`${def.label} planted (${def.sci})`);
     this.onAction?.();
   }
 
   private scatterSeeds(cx: number, cz: number): void {
-    const SPECIES: [Species, number][] = [
-      ['grass', 0.35], ['flower', 0.3], ['fern', 0.15], ['mushroom', 0.1], ['succulent', 0.1],
+    const MIX: [Species, number][] = [
+      ['eleocharis', 0.22], ['sinningia', 0.16], ['pilea', 0.16], ['fittonia', 0.12],
+      ['nephrolepis', 0.1], ['peperomia', 0.08], ['mycena', 0.08], ['echeveria', 0.08],
     ];
     const w = this.world;
     let planted = 0;
@@ -188,8 +197,8 @@ export class Input {
       const top = w.topMat(i);
       if (top !== Mat.SOIL && top !== Mat.SAND) continue;
       let r = Math.random();
-      let species: Species = 'grass';
-      for (const [s, wgt] of SPECIES) { r -= wgt; if (r <= 0) { species = s; break; } }
+      let species: Species = 'eleocharis';
+      for (const [s, wgt] of MIX) { r -= wgt; if (r <= 0) { species = s; break; } }
       w.addPlant(species, x, z, 0.06);
       planted++;
     }

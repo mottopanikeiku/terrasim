@@ -1,5 +1,5 @@
 import { W, D, V } from './constants';
-import { Plant, Species } from '../world/Plants';
+import { Plant, Species, SPECIES } from '../world/Plants';
 
 // The idealized core: the tank is a LAYERED HEIGHTFIELD, not a voxel soup.
 // Each of the 144x60 columns holds a little stack of strata (gravel, sand,
@@ -23,15 +23,7 @@ export enum Mat {
 
 export const MAX_GROUND = 8.6; // world units; keep below the lid
 
-const MAX_PLANTS = 60;
-
-// Health lost per dry growth tick / reseed chances — the living pacing.
-const THIRST: Record<Species, number> = {
-  succulent: 0.03, grass: 0.11, flower: 0.15, fern: 0.16, mushroom: 0.18,
-};
-const SPREAD_CHANCE: Record<Species, number> = {
-  grass: 0.002, flower: 0.0012, fern: 0.0009, mushroom: 0.0015, succulent: 0.0005,
-};
+const MAX_PLANTS = 70;
 
 // Talus slack: max height step (world units) a material holds against its
 // neighbor one cell away. Lower = flatter piles. Damp soil holds steeper.
@@ -59,6 +51,11 @@ export interface Rock {
   seed: number;
 }
 
+export interface LitterPatch {
+  x: number; z: number; // column coords (fractional ok)
+  seed: number;
+}
+
 export class World {
   // Strata stacks (structure-of-arrays).
   readonly stratMat = new Uint8Array(N * MAXS);
@@ -79,6 +76,11 @@ export class World {
   waterDirty = true;    // water mesh needs a refresh
 
   rocks: Rock[] = [];
+  // Leaf litter: decorative AND functional — columns under litter dry out
+  // much more slowly, exactly like mulch in a real terrarium.
+  litter: LitterPatch[] = [];
+  litterDirty = true;
+  private litterMask = new Uint8Array(N);
 
   private plants: Plant[] = [];
   private nextPlantId = 1;
@@ -244,7 +246,41 @@ export class World {
     this.rocks = this.rocks.filter(
       (rk) => Math.hypot(rk.x - cx, rk.z - cz) > radius + rk.scale * 1.5
     );
+    const litterBefore = this.litter.length;
+    this.litter = this.litter.filter(
+      (lp) => Math.hypot(lp.x - cx, lp.z - cz) > radius + 1
+    );
+    if (this.litter.length !== litterBefore) this.rebuildLitterMask();
     this.uprootNear(cx, cz, radius);
+  }
+
+  // Scatter a handful of fallen leaves around a point.
+  addLitter(cx: number, cz: number): void {
+    const n = 5 + ((Math.random() * 4) | 0);
+    for (let k = 0; k < n; k++) {
+      const ang = Math.random() * Math.PI * 2;
+      const d = Math.random() * 4;
+      const x = cx + Math.cos(ang) * d;
+      const z = cz + Math.sin(ang) * d;
+      if (!this.inBounds(Math.round(x), Math.round(z))) continue;
+      if (this.water[this.idx(Math.round(x), Math.round(z))] > 0.05) continue;
+      this.litter.push({ x, z, seed: (Math.random() * 0xffffffff) >>> 0 });
+    }
+    this.rebuildLitterMask();
+    this.changed = true;
+  }
+
+  rebuildLitterMask(): void {
+    this.litterMask.fill(0);
+    for (const lp of this.litter) {
+      const cx = Math.round(lp.x), cz = Math.round(lp.z);
+      for (let dz = -1; dz <= 1; dz++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (this.inBounds(cx + dx, cz + dz)) this.litterMask[this.idx(cx + dx, cz + dz)] = 1;
+        }
+      }
+    }
+    this.litterDirty = true;
   }
 
   // ---- simulation tick (30 Hz) ----
@@ -368,10 +404,12 @@ export class World {
           this.tintDirty = true;
         }
       }
-      // Surface drying (only where no standing water).
+      // Surface drying (only where no standing water). Leaf litter mulches
+      // the column: it dries at a third of the open rate.
       if (this.water[i] <= 1e-4 && this.wet[i] > 0) {
-        this.wet[i] = Math.max(0, this.wet[i] - dryRate);
-        this.humidity = Math.min(100, this.humidity + dryRate * 0.05);
+        const rate = this.litterMask[i] ? dryRate * 0.33 : dryRate;
+        this.wet[i] = Math.max(0, this.wet[i] - rate);
+        this.humidity = Math.min(100, this.humidity + rate * 0.05);
         this.tintDirty = true;
       }
     }
@@ -423,10 +461,12 @@ export class World {
 
     for (let p = this.plants.length - 1; p >= 0; p--) {
       const plant = this.plants[p];
+      const def = SPECIES[plant.species];
       const i = this.idx(plant.x, plant.z);
 
-      // Drowned: standing water over the crown kills land plants slowly.
-      const drowned = this.water[i] > 0.35;
+      // Drowned: standing water over the crown smothers it — tolerance is
+      // a species trait (pond-edge sedges barely care; succulents rot).
+      const drowned = this.water[i] > def.drownDepth;
 
       if (plant.look === 2) {
         plant.decayT -= 0.5;
@@ -434,30 +474,32 @@ export class World {
         continue;
       }
 
-      const drank = !drowned && this.drink(plant);
-      if (drank) {
+      const supply = drowned ? 0 : this.drink(plant);
+      if (supply > 0) {
         plant.health = Math.min(100, plant.health + 1.2);
       } else {
-        plant.health -= drowned ? 0.4 : THIRST[plant.species];
+        plant.health -= drowned ? 0.4 : def.thirst;
       }
 
       if (plant.health <= 0) {
         plant.look = 2;
         plant.decayT = 120;
-        this.events.push(`A ${plant.species} withered away \u{1F342}`);
+        this.events.push(`The ${def.label.toLowerCase()} withered away \u{1F342}`);
         continue;
       }
       if (plant.look === 0 && plant.health < 42) {
         plant.look = 1;
-        this.events.push(`A ${plant.species} is wilting — it needs water \u{1F4A7}`);
+        this.events.push(`The ${def.label.toLowerCase()} is wilting — it needs water \u{1F4A7}`);
       } else if (plant.look === 1 && plant.health > 60) {
         plant.look = 0;
-        this.events.push(`The ${plant.species} perked back up \u{1F33F}`);
+        this.events.push(`The ${def.label.toLowerCase()} perked back up \u{1F33F}`);
       }
 
-      if (plant.look === 0 && drank && plant.stage < 1) {
-        plant.stage = Math.min(1, plant.stage + 0.0008);
-        if (plant.stage >= 1 && plant.species === 'flower' && !this.firstBloomSeen) {
+      if (plant.look === 0 && supply > 0 && plant.stage < 1) {
+        // Pond-edge species surge when they can reach standing water.
+        const bonus = def.waterEdge && supply === 2 ? 1.45 : 1;
+        plant.stage = Math.min(1, plant.stage + 0.0008 * bonus);
+        if (plant.stage >= 1 && def.group === 'flower' && !this.firstBloomSeen) {
           this.firstBloomSeen = true;
           this.events.push('First bloom! \u{1F338}');
         }
@@ -471,22 +513,23 @@ export class World {
     this.mossStep();
   }
 
-  private drink(plant: Plant): boolean {
+  // 0 = nothing to drink, 1 = damp soil, 2 = reaches standing water.
+  private drink(plant: Plant): 0 | 1 | 2 {
     let bestI = -1, bestWet = 0;
     for (let dz = -3; dz <= 3; dz++) {
       for (let dx = -3; dx <= 3; dx++) {
         const x = plant.x + dx, z = plant.z + dz;
         if (!this.inBounds(x, z)) continue;
         const i = this.idx(x, z);
-        if (this.water[i] > 0.02) return true;
+        if (this.water[i] > 0.02) return 2;
         if (this.wet[i] > bestWet) { bestWet = this.wet[i]; bestI = i; }
       }
     }
     if (bestI >= 0 && bestWet >= 0.16) {
       this.wet[bestI] = Math.max(0, this.wet[bestI] - 0.02);
-      return true;
+      return 1;
     }
-    return false;
+    return 0;
   }
 
   private compost(plant: Plant, index: number): void {
@@ -494,31 +537,34 @@ export class World {
     this.addLayer(i, Mat.SOIL, 0.02);
     this.wet[i] = Math.min(1, this.wet[i] + 0.1);
     this.plants.splice(index, 1);
-    this.events.push(`The dead ${plant.species} composted into fresh soil \u{267B}\u{FE0F}`);
+    this.events.push(`The dead ${SPECIES[plant.species].label.toLowerCase()} composted into fresh soil \u{267B}\u{FE0F}`);
   }
 
   private trySpread(plant: Plant): void {
-    if (Math.random() > SPREAD_CHANCE[plant.species]) return;
+    if (Math.random() > SPECIES[plant.species].spread) return;
     this.spreadOnce(plant);
   }
 
   private spreadOnce(plant: Plant): boolean {
+    const def = SPECIES[plant.species];
     const ang = Math.random() * Math.PI * 2;
-    const dist = 8 + Math.random() * 12;
+    // Pond-edge species creep short distances along the bank.
+    const dist = def.waterEdge ? 4 + Math.random() * 7 : 8 + Math.random() * 12;
     const x = Math.round(plant.x + Math.cos(ang) * dist);
     const z = Math.round(plant.z + Math.sin(ang) * dist);
     if (x < 3 || x >= W - 3 || z < 3 || z >= D - 3) return false;
     const i = this.idx(x, z);
     if (this.water[i] > 0.03) return false;
     const top = this.topMat(i);
-    const needsSoil = plant.species !== 'mushroom';
-    if (needsSoil && top !== Mat.SOIL && top !== Mat.SAND) return false;
-    if (this.wet[i] < 0.12 && plant.species !== 'succulent') return false;
+    if (def.needsSoil && top !== Mat.SOIL && top !== Mat.SAND) return false;
+    const droughtProof = def.group === 'succulent';
+    if (this.wet[i] < 0.12 && !droughtProof) return false;
+    const minGap = def.waterEdge ? 5 : 9;
     for (const other of this.plants) {
-      if (Math.abs(other.x - x) + Math.abs(other.z - z) < 9) return false;
+      if (Math.abs(other.x - x) + Math.abs(other.z - z) < minGap) return false;
     }
     this.addPlant(plant.species, x, z, 0.06);
-    this.events.push(`A ${plant.species} seedling sprouted \u{1F331}`);
+    this.events.push(`A ${def.label.toLowerCase()} seedling sprouted \u{1F331}`);
     return true;
   }
 
@@ -706,7 +752,7 @@ export class World {
         if (plant.look === 1 && plant.health > 60) plant.look = 0;
         plant.stage = Math.min(1, plant.stage + 0.0008 * ticks);
       } else {
-        const drain = THIRST[plant.species] * ticks * (hasPond ? 0.05 : 0.15);
+        const drain = SPECIES[plant.species].thirst * ticks * (hasPond ? 0.05 : 0.15);
         plant.health -= Math.min(hasPond ? 55 : 130, drain);
         plant.stage = Math.min(1, plant.stage + 0.0008 * ticks * supply);
       }
@@ -725,7 +771,7 @@ export class World {
     for (const parent of this.plants.slice()) {
       if (seedBudget <= 0) break;
       if (parent.look !== 0 || parent.stage < 1) continue;
-      const odds = Math.min(0.75, SPREAD_CHANCE[parent.species] * ticks * 0.05);
+      const odds = Math.min(0.75, SPECIES[parent.species].spread * ticks * 0.05);
       if (Math.random() < odds && this.spreadOnce(parent)) {
         seedBudget--;
         summary.sprouted++;
@@ -788,6 +834,9 @@ export class World {
     this.wet.fill(0);
     this.moss.fill(0);
     this.rocks = [];
+    this.litter = [];
+    this.litterMask.fill(0);
+    this.litterDirty = true;
     this.plants = [];
     this.humidity = 50;
     this.changed = true;

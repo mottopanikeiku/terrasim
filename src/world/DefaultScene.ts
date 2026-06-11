@@ -101,23 +101,39 @@ export function buildDefaultScene(world: World): void {
   mossPatch(30, 41, 5);
   mossPatch(14, 28, 5);
 
-  // Plants by zone, mostly mature so the scene opens alive.
+  // Plants by zone, mostly mature so the scene opens alive — a tour of
+  // the whole species registry.
   const plantAt = (species: Parameters<World['addPlant']>[0], x: number, z: number, stage: number) => {
     if (!world.isWater(x, z)) world.addPlant(species, x, z, stage);
   };
-  plantAt('fern', 13, 13, 0.95);
-  plantAt('fern', 25, 33, 0.8);
-  plantAt('fern', 10, 45, 0.7);
-  plantAt('mushroom', 24, 20, 1);
-  plantAt('grass', 57, 18, 1);
-  plantAt('grass', 69, 42, 0.9);
-  plantAt('grass', 84, 30, 0.85);
-  plantAt('flower', 63, 30, 1);
-  plantAt('flower', 75, 21, 0.9);
-  plantAt('flower', 52, 45, 0.8);
-  plantAt('succulent', 131, 50, 1);
-  plantAt('succulent', 112, 52, 0.85);
-  plantAt('grass', 99, 14, 0.9);
+  // Mossy highland: ferns, tropical foliage, glowing bonnets in the shade.
+  plantAt('asplenium', 13, 13, 0.95);
+  plantAt('nephrolepis', 25, 33, 0.85);
+  plantAt('nephrolepis', 10, 45, 0.7);
+  plantAt('fittonia', 18, 40, 0.9);
+  plantAt('pilea', 31, 25, 0.85);
+  plantAt('peperomia', 35, 45, 0.8);
+  plantAt('mycena', 24, 19, 1);
+  // Meadow: micro gloxinias and friendship plants among the sedges.
+  plantAt('sinningia', 63, 30, 1);
+  plantAt('sinningia', 52, 45, 0.85);
+  plantAt('pilea', 75, 21, 0.9);
+  plantAt('eleocharis', 57, 16, 0.95);
+  plantAt('fittonia', 86, 38, 0.85);
+  plantAt('leucocoprinus', 70, 48, 0.9);
+  // Pond edge: hairgrass fringe + a sundew in the bog.
+  plantAt('eleocharis', 100, 27, 1);
+  plantAt('eleocharis', 108, 47, 0.9);
+  plantAt('eleocharis', 131, 27, 0.85);
+  plantAt('drosera', 103, 20, 0.9);
+  // Dry sandy shore: the succulent corner.
+  plantAt('echeveria', 134, 52, 1);
+  plantAt('haworthia', 124, 55, 0.9);
+  plantAt('echeveria', 99, 8, 0.85);
+
+  // Leaf litter under the highland canopy.
+  world.addLitter(20, 30);
+  world.addLitter(28, 16);
 
   world.changed = true;
   world.terrainDirty = true;

@@ -158,9 +158,15 @@ export class Water {
           const depth = Math.max(0, y - ground);
           const t = Math.min(1, depth / 0.55);
           this.rip[v] = Math.min(1, depth / 0.06);
-          this.col[v * 3] = SHALLOW.r + (DEEP.r - SHALLOW.r) * t;
-          this.col[v * 3 + 1] = SHALLOW.g + (DEEP.g - SHALLOW.g) * t;
-          this.col[v * 3 + 2] = SHALLOW.b + (DEEP.b - SHALLOW.b) * t;
+          let r = SHALLOW.r + (DEEP.r - SHALLOW.r) * t;
+          let g = SHALLOW.g + (DEEP.g - SHALLOW.g) * t;
+          let b = SHALLOW.b + (DEEP.b - SHALLOW.b) * t;
+          // Bright meniscus line where the water thins out at the shore.
+          const foam = Math.max(0, 1 - depth / 0.03) * 0.55;
+          r += (1.0 - r) * foam; g += (1.0 - g) * foam; b += (1.0 - b) * foam;
+          this.col[v * 3] = r;
+          this.col[v * 3 + 1] = g;
+          this.col[v * 3 + 2] = b;
         }
       }
     }

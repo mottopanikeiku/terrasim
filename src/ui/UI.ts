@@ -1,6 +1,7 @@
 import { ToolId } from '../core/Input';
 import { PresetName } from '../core/Scene';
 import { JournalEntry } from '../core/Journal';
+import { ALL_SPECIES, SPECIES, Species } from '../world/Plants';
 
 interface ToolDef {
   id: ToolId;
@@ -16,18 +17,50 @@ const POUR_TOOLS: ToolDef[] = [
   { id: 'water', label: 'Water', icon: '#6fb3d9', hint: 'Hold left mouse to pour water — plants drink it from the soil' },
 ];
 
-const PLACE_TOOLS: ToolDef[] = [
+// Plant tools come straight from the species registry — every button is a
+// real species, and the tooltip carries its taxonomy and care line.
+const PLANT_TOOLS: ToolDef[] = ALL_SPECIES.map((id) => {
+  const def = SPECIES[id];
+  return {
+    id,
+    label: def.label.split(' ')[0].length <= 6 ? def.label.split(' ')[0] : def.label.split(' ').pop()!,
+    icon: def.icon,
+    hint: `${def.label} · ${def.sci} (${def.family}) — ${def.care}`,
+  };
+});
+
+const EXTRA_TOOLS: ToolDef[] = [
   { id: 'seeds', label: 'Seeds', icon: '\u{1F33E}', hint: 'Toss a handful of mixed seeds — they sprout on damp soil' },
+  { id: 'moss', label: 'Moss', icon: '\u{1F7E2}', hint: 'Click rocks or soil to spread a moss colony' },
   { id: 'rock', label: 'Rock', icon: '\u{1FAA8}', hint: 'Click to set a rock on the terrain' },
-  { id: 'fern', label: 'Fern', icon: '\u{1FAB4}', hint: 'Click on soil to plant a fern' },
-  { id: 'grass', label: 'Grass', icon: '\u{1F33F}', hint: 'Click on soil to plant grass' },
-  { id: 'succulent', label: 'Succulent', icon: '\u{1F331}', hint: 'Click on soil — succulents survive dry spells' },
-  { id: 'flower', label: 'Flower', icon: '\u{1F338}', hint: 'Click on soil to plant a flower' },
-  { id: 'mushroom', label: 'Mushroom', icon: '\u{1F344}', hint: 'Click anywhere damp to plant mushrooms' },
-  { id: 'moss', label: 'Moss', icon: '\u{1F7E2}', hint: 'Click rocks or soil to spread moss' },
+  { id: 'litter', label: 'Litter', icon: '\u{1F342}', hint: 'Scatter fallen leaves — mulch that keeps the soil under it damp' },
 ];
 
 const ERASE_TOOL: ToolDef = { id: 'erase', label: 'Erase', icon: '⌫', hint: 'Hold to dig away material' };
+
+// Field-guide entries for the animals and the substrate science.
+const FAUNA_GUIDE: { label: string; sci: string; family: string; icon: string; lore: string }[] = [
+  {
+    label: 'Common pill-bug', sci: 'Armadillidium vulgare', family: 'Armadillidiidae', icon: '\u{1FAB2}',
+    lore: 'Not an insect — a land crustacean (an isopod) that still breathes through gill-like plates, which is why it needs humid air. Rolls into a perfect ball when alarmed ("conglobation") and earns its keep eating dead plant matter.',
+  },
+  {
+    label: 'Garden snail', sci: 'Cornu aspersum', family: 'Helicidae', icon: '\u{1F40C}',
+    lore: 'Grazes films and tender moss with a radula — a ribbon tongue bearing thousands of microscopic teeth. Seals its shell with dried mucus to wait out dry spells.',
+  },
+  {
+    label: 'Springtail', sci: 'Folsomia candida', family: 'Isotomidae', icon: '\u{26AA}',
+    lore: 'A primitive six-legged soil dweller with a spring-loaded tail (furcula) it snaps to launch itself away from danger. The mold patrol of every bioactive terrarium — watch for tiny pale hops near damp soil.',
+  },
+  {
+    label: 'Common eastern firefly', sci: 'Photinus pyralis', family: 'Lampyridae', icon: '\u{2728}',
+    lore: 'A beetle, not a fly. Its lantern makes cold light from luciferin at nearly 100% efficiency; males cruise at dusk flashing a J-shaped signal to females in the grass.',
+  },
+  {
+    label: 'Butterflies', sci: 'Pieris rapae · Polyommatus icarus', family: 'Pieridae / Lycaenidae', icon: '\u{1F98B}',
+    lore: 'Day-fliers that taste with their feet and drink nectar through a coiled proboscis. At night they do not sleep so much as roost — wings folded, metabolism low, waiting for the sun.',
+  },
+];
 
 export interface Stats {
   humidity: number;
@@ -107,7 +140,8 @@ export class UI {
       toolbar.appendChild(group);
     };
     addGroup('Pour', POUR_TOOLS);
-    addGroup('Plant', PLACE_TOOLS);
+    addGroup('Plant', PLANT_TOOLS);
+    addGroup('Extras', EXTRA_TOOLS);
     addGroup('', [ERASE_TOOL]);
 
     const presets = root.querySelector('#presets')!;
@@ -179,6 +213,13 @@ export class UI {
     guide.textContent = '\u{1F4D6}';
     guide.addEventListener('click', () => this.guideEl.classList.toggle('open'));
     actions.appendChild(guide);
+
+    const fieldGuide = document.createElement('button');
+    fieldGuide.className = 'chip';
+    fieldGuide.title = 'Field guide — every species, with its real botany';
+    fieldGuide.textContent = '\u{1F52C}';
+    fieldGuide.addEventListener('click', () => this.showFieldGuide());
+    actions.appendChild(fieldGuide);
 
     const journal = document.createElement('button');
     journal.className = 'chip';
@@ -322,6 +363,64 @@ export class UI {
   }
 
   private journalEl?: HTMLElement;
+  private fieldGuideEl?: HTMLElement;
+
+  // The field guide: real taxonomy and natural history for everything in
+  // the tank — plants by group, then the animals, then the substrate.
+  private showFieldGuide(): void {
+    if (!this.fieldGuideEl) {
+      const wetBar = (lo: number, hi: number) => {
+        const cells = 10;
+        let bar = '';
+        for (let c = 0; c < cells; c++) {
+          const v = (c + 0.5) / cells;
+          bar += v >= lo && v <= hi ? '\u{25A0}' : '\u{25A1}';
+        }
+        return `<span class="fg-wet" title="preferred soil moisture">dry ${bar} wet</span>`;
+      };
+      const groups: [string, string][] = [
+        ['fern', '\u{1FAB4} Ferns'],
+        ['foliage', '\u{1F343} Tropical foliage'],
+        ['succulent', '\u{1F335} Succulents'],
+        ['sedge', '\u{1F33E} Pond edge'],
+        ['flower', '\u{1F338} Flowering & carnivorous'],
+        ['fungus', '\u{1F344} Fungi'],
+      ];
+      let html = `<h2>\u{1F52C} Field guide</h2>
+        <p class="sub">Every species in this terrarium is real — same family, same habits.</p>`;
+      for (const [g, title] of groups) {
+        html += `<h3>${title}</h3>`;
+        for (const id of ALL_SPECIES) {
+          const d = SPECIES[id as Species];
+          if (d.group !== g) continue;
+          html += `<div class="fg-entry">
+            <div class="fg-head"><span class="emoji">${d.icon}</span>
+              <b>${d.label}</b> <i>${d.sci}</i> <span class="fg-fam">${d.family}</span></div>
+            <p>${d.lore}</p>
+            <p class="fg-care">${wetBar(d.idealWet[0], d.idealWet[1])} &middot; ${d.care}</p>
+          </div>`;
+        }
+      }
+      html += '<h3>\u{1F41B} The animals</h3>';
+      for (const f of FAUNA_GUIDE) {
+        html += `<div class="fg-entry">
+          <div class="fg-head"><span class="emoji">${f.icon}</span>
+            <b>${f.label}</b> <i>${f.sci}</i> <span class="fg-fam">${f.family}</span></div>
+          <p>${f.lore}</p>
+        </div>`;
+      }
+      html += `<h3>\u{1FAA8} The substrate</h3>
+        <p>Real terrariums are built in the same three layers you pour here:
+        a <b>gravel false bottom</b> so excess water drains away from roots
+        instead of turning the soil anaerobic and sour; a <b>sand barrier</b>
+        that keeps fine soil from silting down into the drainage; and a
+        <b>humus-rich topsoil</b> whose capillary pores hold the moisture
+        plants actually drink. Leaf litter on top acts as mulch — it slows
+        evaporation and feeds the cleanup crew as it breaks down.</p>`;
+      this.fieldGuideEl = this.buildOverlay(html);
+    }
+    this.fieldGuideEl.classList.add('open');
+  }
 
   private buildGuide(): void {
     this.guideEl = document.createElement('div');

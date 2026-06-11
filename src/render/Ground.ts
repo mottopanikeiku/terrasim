@@ -19,6 +19,14 @@ const MAT_RANGE: Record<number, RangeName> = {
   [Mat.SOIL]: 'soil',
 };
 
+// The palette was tuned for tiny voxel grains; big smooth sheets need the
+// soil lifted toward warm umber or the plateau reads as a black mass.
+const MAT_BRIGHT: Record<number, number> = {
+  [Mat.GRAVEL]: 1.0,
+  [Mat.SAND]: 1.08,
+  [Mat.SOIL]: 1.45,
+};
+
 const MOSS_COL = new THREE.Color(0x6fae45).convertSRGBToLinear();
 const MOSS_COL2 = new THREE.Color(0x569636).convertSRGBToLinear();
 
@@ -68,7 +76,7 @@ export class Ground {
         this.pos[v * 3] = (vx - W / 2) * V;
         this.pos[v * 3 + 2] = (vz - D / 2) * V;
         this.mottle[v] =
-          0.98 + 0.16 * valueNoise2D(vx * 0.09, vz * 0.09, 17) +
+          1.0 + 0.09 * valueNoise2D(vx * 0.09, vz * 0.09, 17) +
           0.05 * valueNoise2D(vx * 0.4, vz * 0.4, 53);
       }
     }
@@ -150,18 +158,20 @@ export class Ground {
             const range = MAT_RANGE[top] ?? 'soil';
             const base = colShade(range, x, z);
             // Damp ground darkens — the wet ring around the pond.
-            const damp = 1 - Math.min(0.42, w.wet[i] * 0.46);
+            const damp = (1 - Math.min(0.42, w.wet[i] * 0.46)) * (MAT_BRIGHT[top] ?? 1);
             r += base.r * damp; g += base.g * damp; b += base.b * damp;
             n++;
           }
         }
         if (n === 0) n = 1;
         const moss = Math.min(1, mossSum / n);
-        this.cornerH[v] = h / n + moss * 0.05;
-        // Blend toward moss green by coverage.
+        this.cornerH[v] = h / n + moss * 0.06;
+        // Blend toward moss green by coverage; clumpy noise keeps the
+        // carpet from looking airbrushed.
         tmp.setRGB(r / n, g / n, b / n);
+        const clump = 0.75 + 0.5 * valueNoise2D(vx * 0.55, vz * 0.55, 91);
         const mc = (vx + vz) % 2 === 0 ? MOSS_COL : MOSS_COL2;
-        tmp.lerp(mc, Math.min(1, moss * 1.15));
+        tmp.lerp(mc, Math.min(1, Math.pow(moss, 1.4) * 1.5 * clump));
         const tone = this.mottle[v];
         this.col[v * 3] = tmp.r * tone;
         this.col[v * 3 + 1] = tmp.g * tone;
@@ -170,7 +180,9 @@ export class Ground {
       }
     }
 
-    // Analytic normals from the corner height lattice.
+    // Analytic normals + cavity shading from the corner height lattice:
+    // hollows pick up soft contact shadow, crests catch a little extra
+    // light — cheap ambient occlusion that makes the relief readable.
     const ch = this.cornerH;
     for (let vz = 0; vz < VZ; vz++) {
       for (let vx = 0; vx < VX; vx++) {
@@ -184,6 +196,12 @@ export class Ground {
         this.nor[v * 3] = nx / len;
         this.nor[v * 3 + 1] = ny / len;
         this.nor[v * 3 + 2] = nz / len;
+
+        const cavity = ch[v] - (hl + hr + hd + hu) * 0.25;
+        const ao = Math.min(1.06, Math.max(0.88, 1 + cavity * 1.1));
+        this.col[v * 3] *= ao;
+        this.col[v * 3 + 1] *= ao;
+        this.col[v * 3 + 2] *= ao;
       }
     }
 
@@ -232,12 +250,15 @@ export class Ground {
       for (let s = 0; s < w.stratN[i]; s++) {
         const h = w.stratH[b + s];
         if (h < 1e-4) continue;
-        const y1 = y0 + h;
+        // The top stratum overlaps up into the terrain sheet, so steep
+        // slopes never show a sliver of gap at the glass.
+        const y1 = y0 + h + (s === w.stratN[i] - 1 ? 0.055 : 0);
         const r = RANGES[MAT_RANGE[w.stratMat[b + s]] ?? 'soil'];
         // One mid shade per material with smooth brightness drift along
         // the wall — strata bands, not pinstripes or patch blocks.
         const drift = 0.82 + 0.26 * valueNoise2D((x + z) * 0.11, s * 3.7, 31);
-        tmp.copy(PALETTE[r.start + (r.count >> 1)]).multiplyScalar(0.8 * drift * (s === w.stratN[i] - 1 ? damp : 1));
+        const lift = MAT_BRIGHT[w.stratMat[b + s]] ?? 1;
+        tmp.copy(PALETTE[r.start + (r.count >> 1)]).multiplyScalar(0.95 * drift * lift * (s === w.stratN[i] - 1 ? damp : 1));
         if (axis === 'x') {
           const wx = sign < 0 ? wx0 : wx1;
           if (sign < 0) this.skirtQuad(wx, y0, wz0, wx, y0, wz1, wx, y1, wz1, wx, y1, wz0, -1, 0, 0, tmp);

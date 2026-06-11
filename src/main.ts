@@ -3,6 +3,7 @@ import { World, AwaySummary } from './core/World';
 import { Ground } from './render/Ground';
 import { Water } from './render/Water';
 import { Rocks } from './render/Rocks';
+import { Litter } from './render/Litter';
 import { PourStream } from './render/PourStream';
 import { Input } from './core/Input';
 import { Aquarium } from './world/Aquarium';
@@ -44,6 +45,7 @@ function init(): void {
   const ground = new Ground(sceneMgr.scene, world);
   const water = new Water(sceneMgr.scene, world);
   const rocks = new Rocks(sceneMgr.scene, world);
+  const litter = new Litter(sceneMgr.scene, world);
   const pourStream = new PourStream(sceneMgr.scene);
   const plantRenderer = new PlantRenderer(sceneMgr.scene, world);
   const critters = new Critters(sceneMgr.scene, world);
@@ -165,14 +167,16 @@ function init(): void {
     water.update();
     water.setTime(time);
     rocks.update();
+    litter.update(rawDt);
 
     // Pour-stream feedback: particles between cursor and ground.
     const pk = input.currentPick();
     pourStream.set(input.pouringTool(), pk.point ?? null, pk.point ? pk.point.y : 0);
     pourStream.update(rawDt);
 
-    plantRenderer.update(rawDt, time);
-    critters.update(rawDt, time, sceneMgr.currentPreset === 'night');
+    const night = sceneMgr.currentPreset === 'night';
+    plantRenderer.update(rawDt, time, night);
+    critters.update(rawDt, time, night);
     condensation.update(rawDt, world.humidity);
     room.update(rawDt);
     const pourKind = input.pouringTool();
