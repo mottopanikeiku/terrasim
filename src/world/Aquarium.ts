@@ -20,15 +20,26 @@ export class Aquarium {
     const glass = new THREE.MeshPhysicalMaterial({
       color: 0xf4fbf7,
       transparent: true,
-      opacity: 0.06,
+      opacity: 0.085,
       roughness: 0.04,
       metalness: 0.0,
-      envMapIntensity: 0.7,
+      envMapIntensity: 0.95,
       clearcoat: 1.0,
       clearcoatRoughness: 0.06,
       side: THREE.DoubleSide,
       depthWrite: false,
     });
+    // Fresnel rim: panes catch warm light at glancing angles, so the
+    // vessel itself reads as a real object instead of an invisible box.
+    glass.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader.replace(
+        '#include <dithering_fragment>',
+        `#include <dithering_fragment>
+        float fres = pow(1.0 - abs(dot(normalize(vViewPosition), normalize(vNormal))), 3.5);
+        gl_FragColor.rgb += vec3(1.0, 0.94, 0.82) * fres * 0.07;
+        gl_FragColor.a = min(1.0, gl_FragColor.a + fres * 0.1);`
+      );
+    };
 
     const panes: [number, number, number, number, number, number][] = [
       // [sx, sy, sz, px, py, pz]

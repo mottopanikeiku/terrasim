@@ -106,34 +106,54 @@ export function buildDefaultScene(world: World): void {
   const plantAt = (species: Parameters<World['addPlant']>[0], x: number, z: number, stage: number) => {
     if (!world.isWater(x, z)) world.addPlant(species, x, z, stage);
   };
-  // Mossy highland: ferns, tropical foliage, glowing bonnets in the shade.
+  // Mossy highland: a dense fern corner with foliage underplanting —
+  // real terrariums are LUSH, so the opening scene is too.
   plantAt('asplenium', 13, 13, 0.95);
+  plantAt('asplenium', 8, 22, 0.7);
   plantAt('nephrolepis', 25, 33, 0.85);
-  plantAt('nephrolepis', 10, 45, 0.7);
+  plantAt('nephrolepis', 10, 45, 0.75);
+  plantAt('nephrolepis', 19, 8, 0.65);
   plantAt('fittonia', 18, 40, 0.9);
+  plantAt('fittonia', 14, 33, 0.7);
+  plantAt('fittonia', 28, 42, 0.6);
   plantAt('pilea', 31, 25, 0.85);
+  plantAt('pilea', 7, 33, 0.7);
   plantAt('peperomia', 35, 45, 0.8);
+  plantAt('peperomia', 27, 51, 0.65);
   plantAt('mycena', 24, 19, 1);
-  // Meadow: micro gloxinias and friendship plants among the sedges.
+  plantAt('mycena', 16, 24, 0.8);
+  // Meadow: gloxinias, friendship plants and sedge tussocks.
   plantAt('sinningia', 63, 30, 1);
   plantAt('sinningia', 52, 45, 0.85);
+  plantAt('sinningia', 58, 38, 0.6);
   plantAt('pilea', 75, 21, 0.9);
+  plantAt('pilea', 66, 14, 0.7);
   plantAt('eleocharis', 57, 16, 0.95);
+  plantAt('eleocharis', 47, 26, 0.8);
   plantAt('fittonia', 86, 38, 0.85);
+  plantAt('nephrolepis', 45, 38, 0.7);
   plantAt('leucocoprinus', 70, 48, 0.9);
-  // Pond edge: hairgrass fringe + a sundew in the bog.
+  plantAt('sinningia', 80, 50, 0.75);
+  // Pond edge: a thick hairgrass fringe + sundews in the bog.
   plantAt('eleocharis', 100, 27, 1);
   plantAt('eleocharis', 108, 47, 0.9);
   plantAt('eleocharis', 131, 27, 0.85);
+  plantAt('eleocharis', 96, 38, 0.85);
+  plantAt('eleocharis', 121, 12, 0.8);
   plantAt('drosera', 103, 20, 0.9);
+  plantAt('drosera', 99, 45, 0.7);
   // Dry sandy shore: the succulent corner.
   plantAt('echeveria', 134, 52, 1);
   plantAt('haworthia', 124, 55, 0.9);
+  plantAt('haworthia', 138, 42, 0.75);
   plantAt('echeveria', 99, 8, 0.85);
+  plantAt('echeveria', 109, 5, 0.7);
 
   // Leaf litter under the highland canopy.
   world.addLitter(20, 30);
   world.addLitter(28, 16);
+  world.addLitter(12, 38);
+  world.addLitter(72, 44);
 
   world.changed = true;
   world.terrainDirty = true;
