@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { V, cellToWorld } from '../core/constants';
-import { Grid } from '../core/Grid';
+import { World } from '../core/World';
 
 // The cozy room around the tank: a plaster wall, framed prints, and little
 // desk props — plus the tiny details that sell a miniature world: a snail
@@ -136,10 +136,10 @@ export class Room {
   private dripY = 0;
   private dripFalling = false;
   private labels: { group: THREE.Group; gx: number; gz: number }[] = [];
-  private grid?: Grid;
+  private world?: World;
 
-  constructor(scene: THREE.Scene, grid?: Grid) {
-    this.grid = grid;
+  constructor(scene: THREE.Scene, world?: World) {
+    this.world = world;
     // Quiet warm plaster wall, darker toward the edges so the lit tank is
     // the unambiguous subject — busy wallpaper patterns read cheap.
     const wallTex = canvasTexture(1024, 512, (ctx, w, h) => {
@@ -313,11 +313,10 @@ export class Room {
 
   // Animates the watering-can drip and keeps soil labels riding the terrain.
   update(dt: number): void {
-    if (this.grid) {
+    if (this.world) {
       for (const l of this.labels) {
-        const top = this.grid.top(l.gx, l.gz);
         const [wx, , wz] = cellToWorld(l.gx, 0, l.gz);
-        l.group.position.set(wx, Math.max(0, (top + 1)) * V - 0.1, wz);
+        l.group.position.set(wx, Math.max(0, this.world.groundWorldY(l.gx, l.gz)) + 0.06, wz);
       }
     }
 

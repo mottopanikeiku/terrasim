@@ -1,124 +1,125 @@
 import { W, D } from '../core/constants';
-import { Cell, Grid } from '../core/Grid';
-import { Simulation } from '../core/Simulation';
-import { randomShade } from '../core/palette';
+import { Mat, World } from '../core/World';
 import { valueNoise2D } from '../core/random';
 
-// A finished-looking landscape with three zones across the panoramic tank:
-// a mossy highland on the left, an open meadow in the middle, and a sandy
-// pond shore on the right.
-export function buildDefaultScene(grid: Grid, sim: Simulation): void {
-  grid.clear();
-  sim.humidity = 58;
+// The opening scene: a finished-looking landscape across the panoramic
+// tank — mossy highland on the left, rolling meadow in the middle, and a
+// sandy shore with a clear pond on the right. Built directly into the
+// heightfield: no settling pre-roll needed.
+export function buildDefaultScene(world: World): void {
+  world.clear();
+  world.humidity = 58;
 
-  for (let x = 0; x < W; x++) {
-    for (let z = 0; z < D; z++) {
-      const gravelH = 5 + Math.round(valueNoise2D(x * 0.08, z * 0.08, 7) * 2);
-      const sandH = gravelH + 3 + Math.round(valueNoise2D(x * 0.07, z * 0.07, 21) * 3);
+  const pcx = 118, pcz = 32, pr = 17; // pond center / radius (columns)
+
+  for (let z = 0; z < D; z++) {
+    for (let x = 0; x < W; x++) {
+      const i = world.idx(x, z);
+      const u = x / W;
+
+      const gravel = 0.55 + valueNoise2D(x * 0.07, z * 0.07, 7) * 0.25;
+      let sand = 0.45 + valueNoise2D(x * 0.06, z * 0.06, 21) * 0.3;
 
       // Zone profile: tall on the left, rolling center, low sandy right.
-      const u = x / W;
-      const highland = Math.max(0, 1 - u * 2.4) * 10; // left third
-      const rolling = valueNoise2D(x * 0.033, z * 0.033, 42) * 6;
-      const shore = Math.max(0, (u - 0.62) * 2.6) * -6; // right third dips
-      const soilH = sandH + 3 + Math.round(highland + rolling + shore);
+      const highland = Math.max(0, 1 - u * 2.3) * 1.5;
+      const rolling = valueNoise2D(x * 0.03, z * 0.03, 42) * 0.85;
+      const shore = Math.max(0, (u - 0.6) * 2.5) * -0.9;
+      let soil = Math.max(0.15, 0.55 + highland + rolling + shore);
 
-      const sandyTop = u > 0.68; // beach zone gets a sand cap
-      for (let y = 0; y < Math.max(soilH, sandH + 1); y++) {
-        if (y < gravelH) grid.set(x, y, z, Cell.GRAVEL, randomShade('gravel'));
-        else if (y < sandH) grid.set(x, y, z, Cell.SAND, randomShade('sand'));
-        else if (y < soilH) {
-          if (sandyTop && y >= soilH - 3) {
-            grid.set(x, y, z, Cell.SAND, randomShade('sand'), 20);
-          } else {
-            grid.set(x, y, z, Cell.SOIL, randomShade('soil'), 40 + ((Math.random() * 80) | 0));
-          }
+      // Pond basin: scoop a bowl (digging into the sand bed once the soil
+      // is gone) and raise a soft bank lip so the water has a true rim.
+      const pd = Math.hypot(x - pcx, z - pcz);
+      if (pd < pr) {
+        const bowl = (1 - pd / pr) ** 1.3 * 1.35;
+        const fromSoil = Math.min(soil, bowl);
+        soil -= fromSoil;
+        sand = Math.max(0.1, sand - (bowl - fromSoil));
+      } else if (pd < pr + 5) {
+        soil += (1 - (pd - pr) / 5) * 0.22;
+      }
+
+      world.addLayer(i, Mat.GRAVEL, gravel);
+      world.addLayer(i, Mat.SAND, sand);
+      if (soil > 0.02) {
+        if (u > 0.68) {
+          // Beach zone: sand cap instead of soil.
+          world.addLayer(i, Mat.SAND, soil * 0.8);
+        } else {
+          world.addLayer(i, Mat.SOIL, soil);
         }
+      }
+
+      // Moisture: gently damp on the left, wet ring near the pond.
+      world.wet[i] = Math.min(1, Math.max(0.12, 0.32 - u * 0.2) + Math.max(0, 1 - pd / (pr + 6)) * 0.7);
+    }
+  }
+
+  // Fill the pond to just below the lowest escape point of the bank.
+  let rim = Infinity;
+  for (let z = 0; z < D; z++) {
+    for (let x = 0; x < W; x++) {
+      const pd = Math.hypot(x - pcx, z - pcz);
+      if (pd > pr - 1 && pd < pr + 4) {
+        rim = Math.min(rim, world.groundH[world.idx(x, z)]);
+      }
+    }
+  }
+  const level = rim - 0.03;
+  for (let z = 0; z < D; z++) {
+    for (let x = 0; x < W; x++) {
+      const i = world.idx(x, z);
+      if (Math.hypot(x - pcx, z - pcz) < pr && world.groundH[i] < level) {
+        world.water[i] = level - world.groundH[i];
+        world.wet[i] = 1;
       }
     }
   }
 
   // Rocks: a pair on the highland, one lone boulder mid-meadow.
-  placeRockBlob(grid, 21, 20, 18, 5.4, 3.6, 4.5);
-  placeRockBlob(grid, 31, 18, 42, 3.9, 2.7, 3.3);
-  placeRockBlob(grid, 78, 14, 15, 3.3, 2.5, 3.0);
+  world.rocks.push(
+    { x: 21, z: 18, scale: 0.95, seed: 101 },
+    { x: 26, z: 23, scale: 0.6, seed: 202 },
+    { x: 31, z: 42, scale: 0.75, seed: 303 },
+    { x: 78, z: 15, scale: 0.65, seed: 404 }
+  );
 
-  // Let the substrate slump into its natural angle of repose first.
-  for (let i = 0; i < 110; i++) sim.tick();
-
-  // Pond: a wide basin against the front-right glass.
-  const pcx = 120, pcz = 45, pr = 18;
-  const waterLevel = 10;
-  for (let x = pcx - pr; x <= pcx + pr; x++) {
-    for (let z = pcz - pr; z <= pcz + pr; z++) {
-      if (x < 0 || x >= W || z < 0 || z >= D) continue;
-      const dist = Math.hypot(x - pcx, z - pcz);
-      if (dist > pr) continue;
-      const floor = Math.max(6, waterLevel - Math.round((1 - dist / pr) * 6) - 1);
-      for (let y = floor; y < 45; y++) {
-        if (grid.get(x, y, z) !== Cell.EMPTY) grid.clearCell(x, y, z);
-      }
-      if (grid.get(x, floor - 1, z) !== Cell.EMPTY) {
-        grid.set(x, floor - 1, z, Cell.GRAVEL, randomShade('gravel'));
+  // Moss carpets around the highland rocks.
+  const mossPatch = (cx: number, cz: number, r: number) => {
+    for (let dz = -r; dz <= r; dz++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const x = cx + dx, z = cz + dz;
+        if (!world.inBounds(x, z)) continue;
+        const d = Math.hypot(dx, dz) / r;
+        if (d > 1) continue;
+        const i = world.idx(x, z);
+        if (world.water[i] > 0.02) continue;
+        world.moss[i] = Math.min(1, world.moss[i] + (1 - d) * (0.5 + Math.random() * 0.4));
       }
     }
-  }
-  for (let i = 0; i < 40; i++) sim.tick();
-  for (let x = pcx - pr; x <= pcx + pr; x++) {
-    for (let z = pcz - pr; z <= pcz + pr; z++) {
-      if (x < 0 || x >= W || z < 0 || z >= D) continue;
-      if (Math.hypot(x - pcx, z - pcz) > pr - 1) continue;
-      for (let y = 6; y <= waterLevel; y++) {
-        if (grid.get(x, y, z) === Cell.EMPTY) {
-          grid.set(x, y, z, Cell.WATER, randomShade('water'));
-        }
-      }
-    }
-  }
-  for (let i = 0; i < 80; i++) sim.tick();
+  };
+  mossPatch(21, 16, 6);
+  mossPatch(30, 41, 5);
+  mossPatch(14, 28, 5);
 
   // Plants by zone, mostly mature so the scene opens alive.
-  const plantAt = (species: Parameters<Simulation['addPlant']>[0], x: number, z: number, stage: number) => {
-    const y = grid.top(x, z) + 1;
-    if (y > 0 && grid.get(x, y - 1, z) !== Cell.WATER) sim.addPlant(species, x, y, z, stage);
+  const plantAt = (species: Parameters<World['addPlant']>[0], x: number, z: number, stage: number) => {
+    if (!world.isWater(x, z)) world.addPlant(species, x, z, stage);
   };
-  // Highland (ferns, moss, mushrooms in the rock shade)
   plantAt('fern', 13, 13, 0.95);
   plantAt('fern', 25, 33, 0.8);
   plantAt('fern', 10, 45, 0.7);
-  plantAt('mushroom', 27, 21, 1);
-  sim.paintMoss(21, 18);
-  sim.paintMoss(31, 42);
-  sim.paintMoss(16, 27);
-  // Meadow (grass + flowers)
+  plantAt('mushroom', 24, 20, 1);
   plantAt('grass', 57, 18, 1);
   plantAt('grass', 69, 42, 0.9);
   plantAt('grass', 84, 30, 0.85);
   plantAt('flower', 63, 30, 1);
   plantAt('flower', 75, 21, 0.9);
   plantAt('flower', 52, 45, 0.8);
-  // Shore (succulents like it dry, one grass tuft at the waterline)
-  plantAt('succulent', 129, 15, 1);
-  plantAt('succulent', 114, 21, 0.85);
-  plantAt('grass', 105, 49, 0.9);
+  plantAt('succulent', 131, 50, 1);
+  plantAt('succulent', 112, 52, 0.85);
+  plantAt('grass', 99, 14, 0.9);
 
-  sim.changed = true;
-}
-
-function placeRockBlob(grid: Grid, cx: number, cy: number, cz: number, rx: number, ry: number, rz: number): void {
-  const r = Math.ceil(Math.max(rx, rz));
-  for (let dx = -r; dx <= r; dx++) {
-    for (let dy = -Math.ceil(ry); dy <= Math.ceil(ry); dy++) {
-      for (let dz = -r; dz <= r; dz++) {
-        const d = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) + (dz * dz) / (rz * rz);
-        if (d > 1 - Math.random() * 0.2) continue;
-        const x = cx + dx, y = cy + dy, z = cz + dz;
-        if (!grid.inBounds(x, y, z)) continue;
-        const t = grid.get(x, y, z);
-        if (t === Cell.EMPTY || t === Cell.WATER || t === Cell.SOIL) {
-          grid.set(x, y, z, Cell.ROCK, randomShade('rock'));
-        }
-      }
-    }
-  }
+  world.changed = true;
+  world.terrainDirty = true;
+  world.waterDirty = true;
 }

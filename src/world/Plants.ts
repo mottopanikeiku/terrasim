@@ -6,9 +6,8 @@ export type Look = 0 | 1 | 2; // healthy | wilted | dead
 export interface Plant {
   id: number;
   species: Species;
-  x: number;
-  y: number;
-  z: number;
+  x: number; // column coords — height comes from the terrain, so plants
+  z: number; // ride the ground as it settles and grows
   seed: number;
   stage: number; // 0..1 growth
   health: number; // 0..100 — driven by access to moisture
