@@ -160,6 +160,20 @@
         font-size: 0.72rem; color: rgba(232, 207, 158, 0.65);
         white-space: nowrap;
       }
+      .fg-entry {
+        padding: 8px 0 4px;
+        border-bottom: 1px solid rgba(255, 235, 195, 0.07);
+      }
+      .fg-head { font-size: 0.9rem; color: #f3e6c8; margin-bottom: 0.15rem; }
+      .fg-head .emoji { margin-right: 6px; }
+      .fg-head i { color: rgba(232, 207, 158, 0.85); font-size: 0.82rem; margin-left: 4px; }
+      .fg-fam {
+        font-size: 0.68rem; color: rgba(240, 230, 210, 0.5);
+        margin-left: 6px; letter-spacing: 0.06em;
+      }
+      .fg-entry p { font-size: 0.82rem; }
+      .fg-care { color: rgba(232, 207, 158, 0.8) !important; font-size: 0.76rem !important; }
+      .fg-wet { font-family: monospace; font-size: 0.7rem; letter-spacing: 0.05em; }
 
       #topbar {
         position: fixed; top: 18px; right: 18px; z-index: 10;
@@ -202,10 +216,10 @@
         color: rgba(240, 233, 220, 0.5);
         margin: 0 0 6px 4px; height: 0.8em;
       }
-      .row { display: flex; gap: 4px; }
+      .row { display: flex; gap: 4px; flex-wrap: wrap; max-width: 420px; justify-content: center; }
       .tool {
         display: flex; flex-direction: column; align-items: center; gap: 3px;
-        min-width: 54px; padding: 7px 6px 5px;
+        min-width: 50px; padding: 7px 5px 5px;
         border: none; border-radius: 12px;
         background: transparent; color: #f0e9dc;
         cursor: pointer;

@@ -1,5 +1,5 @@
 import { World, N, MAXS } from './World';
-import { Plant } from '../world/Plants';
+import { LEGACY_SPECIES, Plant, SPECIES } from '../world/Plants';
 import { Journal, JournalEntry } from './Journal';
 
 const KEY = 'terrasim-v5'; // same slot; payload carries its own version
@@ -57,6 +57,7 @@ export function save(world: World, journal: Journal): void {
       humidity: world.humidity,
       plants: world.getPlants(),
       rocks: world.rocks,
+      litter: world.litter,
       meta: {
         savedAt: Date.now(),
         bornAt: journal.bornAt,
@@ -97,11 +98,15 @@ export function load(world: World): { meta: SaveMeta; restored: boolean } | null
     }
     world.humidity = p.humidity ?? 50;
     world.rocks = p.rocks ?? [];
+    world.litter = p.litter ?? [];
+    world.rebuildLitterMask();
     const plants = (p.plants ?? []) as Plant[];
     for (const pl of plants) {
       if (pl.health === undefined) pl.health = 80;
       if (pl.look === undefined) pl.look = 0;
       if (pl.decayT === undefined) pl.decayT = 0;
+      // Saves from before the species expansion used generic names.
+      if (!SPECIES[pl.species]) pl.species = LEGACY_SPECIES[pl.species] ?? 'pilea';
     }
     world.restorePlants(plants);
     world.changed = true;

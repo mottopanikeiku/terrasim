@@ -282,8 +282,9 @@ class Butterfly {
   }
 
   private pickFlower(): THREE.Vector3 | null {
+    // Butterflies visit anything in bloom — gloxinia trumpets and sundews.
     const flowers = this.world.getPlants().filter(
-      (p) => p.species === 'flower' && p.look === 0 && p.stage > 0.6
+      (p) => (p.species === 'sinningia' || p.species === 'drosera') && p.look === 0 && p.stage > 0.6
     );
     if (flowers.length === 0) return null;
     const f = flowers[(Math.random() * flowers.length) | 0];
@@ -351,12 +352,75 @@ class Butterfly {
   }
 }
 
+// ---------- springtails ----------
+
+// Folsomia candida: tiny pale hexapods that hop around damp soil. Barely
+// visible until you lean in — then the tank is suddenly very alive.
+class Springtails {
+  private points: THREE.Points;
+  private pos: Float32Array;
+  private home: Float32Array;  // column coords per bug
+  private hop: Float32Array;   // hop phase; <0 means resting
+  private n = 12;
+
+  constructor(scene: THREE.Scene, private world: World) {
+    this.pos = new Float32Array(this.n * 3);
+    this.home = new Float32Array(this.n * 2);
+    this.hop = new Float32Array(this.n);
+    for (let i = 0; i < this.n; i++) {
+      this.home[i * 2] = 10 + Math.random() * (W - 20);
+      this.home[i * 2 + 1] = 8 + Math.random() * (D - 16);
+      this.hop[i] = -Math.random() * 4;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
+    this.points = new THREE.Points(geo, new THREE.PointsMaterial({
+      color: 0xe8e4d8,
+      size: 0.045,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false,
+    }));
+    this.points.frustumCulled = false;
+    scene.add(this.points);
+  }
+
+  update(dt: number): void {
+    for (let i = 0; i < this.n; i++) {
+      let hx = this.home[i * 2], hz = this.home[i * 2 + 1];
+      this.hop[i] += dt * 3.2;
+      if (this.hop[i] > 1) {
+        // Land, settle, pick the next little hop on damp ground.
+        this.hop[i] = -0.5 - Math.random() * 3.5;
+        for (let tries = 0; tries < 4; tries++) {
+          const nx = Math.min(W - 4, Math.max(3, hx + (Math.random() - 0.5) * 5));
+          const nz = Math.min(D - 4, Math.max(3, hz + (Math.random() - 0.5) * 5));
+          if (!this.world.isWater(Math.round(nx), Math.round(nz))) {
+            this.home[i * 2] = nx;
+            this.home[i * 2 + 1] = nz;
+            break;
+          }
+        }
+        hx = this.home[i * 2]; hz = this.home[i * 2 + 1];
+      }
+      const t = Math.max(0, this.hop[i]);
+      const arc = Math.sin(Math.min(1, t) * Math.PI) * 0.07;
+      const [wx, , wz] = cellToWorld(Math.round(hx), 0, Math.round(hz));
+      this.pos[i * 3] = wx + (hx - Math.round(hx)) * V;
+      this.pos[i * 3 + 1] = groundWorldY(this.world, hx, hz) + 0.025 + arc;
+      this.pos[i * 3 + 2] = wz + (hz - Math.round(hz)) * V;
+    }
+    (this.points.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+  }
+}
+
 // ---------- the troupe ----------
 
 export class Critters {
   private isopods: Isopod[] = [];
   private snail: Snail;
   private butterflies: Butterfly[] = [];
+  private springtails: Springtails;
   private fireflies: THREE.Points;
   private fireflyPhase: Float32Array;
   private fireflyVisible = 0;
@@ -364,6 +428,7 @@ export class Critters {
   constructor(scene: THREE.Scene, world: World) {
     for (let n = 0; n < 3; n++) this.isopods.push(new Isopod(scene, world));
     this.snail = new Snail(scene, world);
+    this.springtails = new Springtails(scene, world);
     this.butterflies.push(new Butterfly(scene, world, 0xe2899f));
     this.butterflies.push(new Butterfly(scene, world, 0x8fb7dd));
 
@@ -393,6 +458,7 @@ export class Critters {
   update(dt: number, time: number, night: boolean): void {
     for (const iso of this.isopods) iso.update(dt);
     this.snail.update(dt);
+    this.springtails.update(dt);
     for (const b of this.butterflies) b.update(dt, time, night);
 
     const targetVis = night ? 1 : 0;

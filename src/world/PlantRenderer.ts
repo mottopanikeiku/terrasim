@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { W, D, V } from '../core/constants';
 import { World } from '../core/World';
 import { buildPlantGeometry } from './PlantMeshes';
-import { Plant } from './Plants';
+import { Plant, SPECIES } from './Plants';
 
 interface Visual {
   mesh: THREE.Mesh;
@@ -12,7 +12,11 @@ interface Visual {
   tint: THREE.Color;
   droop: number;
   dying: boolean;
+  glows: boolean;
+  glow: number;
 }
+
+const GLOW_COLOR = new THREE.Color(0x6fffb4);
 
 const TINT_HEALTHY = new THREE.Color(1, 1, 1);
 const TINT_WILT = new THREE.Color(1.0, 0.82, 0.5);
@@ -25,7 +29,7 @@ export class PlantRenderer {
 
   constructor(private scene: THREE.Scene, private world: World) {}
 
-  update(dt: number, time: number): void {
+  update(dt: number, time: number, night = false): void {
     const plants = this.world.getPlants();
     const seen = new Set<number>();
 
@@ -57,6 +61,13 @@ export class PlantRenderer {
       const sway = Math.sin(time * 1.1 + v.phase) * 0.025 * (p.look === 0 ? 1 : 0.4);
       v.mesh.rotation.z = sway + v.droop;
       v.mesh.rotation.x = Math.cos(time * 0.9 + v.phase * 1.7) * 0.015;
+
+      // Bioluminescence: Mycena chlorophos breathes green light at night.
+      if (v.glows) {
+        const target = night && p.look === 0 ? 0.55 + Math.sin(time * 1.3 + v.phase) * 0.15 : 0;
+        v.glow += (target - v.glow) * Math.min(1, dt * 1.2);
+        v.mat.emissiveIntensity = v.glow;
+      }
     }
 
     // Plants gone from the sim shrink away and are disposed.
@@ -75,12 +86,15 @@ export class PlantRenderer {
 
   private create(p: Plant): Visual {
     const geo = buildPlantGeometry(p.species, p.seed);
+    const glows = !!SPECIES[p.species]?.glows;
     const mat = new THREE.MeshStandardMaterial({
       vertexColors: true,
       roughness: 0.62,
       metalness: 0,
       side: THREE.DoubleSide,
       envMapIntensity: 0.4,
+      emissive: glows ? GLOW_COLOR : undefined,
+      emissiveIntensity: 0,
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(
@@ -98,6 +112,8 @@ export class PlantRenderer {
       tint: TINT_HEALTHY.clone(),
       droop: 0,
       dying: false,
+      glows,
+      glow: 0,
     };
   }
 
