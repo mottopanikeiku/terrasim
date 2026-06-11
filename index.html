@@ -3,39 +3,42 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-    <meta name="description" content="A realistic terrarium sandbox — pour soil, water and sand into a glass aquarium, plant ferns and moss, and watch it grow." />
+    <meta name="description" content="A realistic terrarium sandbox — pour soil, water and sand into a glass aquarium, plant real species, and watch a tiny world live." />
     <meta property="og:title" content="Terrarium" />
-    <meta property="og:description" content="Pour, plant, grow — a realistic terrarium sandbox in your browser." />
+    <meta property="og:description" content="Pour, plant, grow — a living terrarium in your browser." />
     <title>Terrarium</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
     <style>
+      /* ---- the keeper's journal design system: warm paper, brown ink ---- */
+      :root {
+        --paper: #f6edd8;
+        --paper-deep: #efe2c4;
+        --paper-edge: #d9c69e;
+        --ink: #4c3a24;
+        --ink-soft: #80684a;
+        --ink-faint: #a8916e;
+        --accent: #b9683a;
+        --accent-soft: #e8c9a4;
+        --leaf: #5d7d46;
+      }
       *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
       html, body { width: 100%; height: 100%; overflow: hidden; }
       body {
         font-family: 'DM Sans', sans-serif;
-        background: #2b241b;
-        color: #f0e9dc;
+        background: #221c14;
+        color: var(--ink);
         -webkit-user-select: none;
         user-select: none;
       }
       #app { width: 100%; height: 100%; position: relative; }
       canvas { display: block; }
 
-      /* soft photographic vignette, done in CSS so the GPU stays free */
-      #app::after {
-        content: '';
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        background: radial-gradient(ellipse at 50% 42%, transparent 52%, rgba(18, 12, 7, 0.5) 100%);
-      }
-
       #loading {
         position: fixed; inset: 0; z-index: 100;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
-        background: #2b241b;
+        background: #221c14;
         transition: opacity 0.7s ease;
       }
       #loading.fade-out { opacity: 0; pointer-events: none; }
@@ -45,217 +48,307 @@
       #brand {
         position: fixed; top: 18px; left: 22px; z-index: 10; pointer-events: none;
       }
-      #brand h1 { font-family: 'Fraunces', serif; font-weight: 500; font-size: 1.5rem; color: #f3e8d2; text-shadow: 0 1px 8px rgba(0,0,0,0.35); }
-      #brand span { font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(243, 232, 210, 0.65); }
+      #brand h1 { font-family: 'Fraunces', serif; font-weight: 500; font-size: 1.5rem; color: #f3e8d2; text-shadow: 0 1px 10px rgba(0,0,0,0.45); }
+      #brand span { font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(243, 232, 210, 0.6); }
 
+      /* paper tag pinned top-left */
       #stats {
-        position: fixed; top: 74px; left: 22px; z-index: 10;
-        display: flex; gap: 12px;
-        padding: 7px 14px;
-        background: rgba(28, 22, 14, 0.55);
-        border: 1px solid rgba(255, 245, 220, 0.12);
-        border-radius: 999px;
-        backdrop-filter: blur(12px);
-        font-size: 0.82rem;
+        position: fixed; top: 72px; left: 22px; z-index: 10;
+        display: flex; gap: 11px;
+        padding: 7px 15px;
+        background: var(--paper);
+        border: 1px solid var(--paper-edge);
+        border-radius: 4px 12px 12px 4px;
+        box-shadow: 0 3px 14px rgba(10, 6, 2, 0.35);
+        transform: rotate(-0.6deg);
+        font-size: 0.8rem; color: var(--ink);
         cursor: default;
       }
       #stats span { display: inline-flex; align-items: center; gap: 2px; }
 
+      #alerts {
+        position: fixed; top: 122px; left: 22px; z-index: 10;
+        display: flex; flex-direction: column; gap: 6px;
+        max-width: 300px;
+      }
+      .alert {
+        padding: 8px 14px;
+        background: #f7e3b6;
+        border: 1px solid #d9b878;
+        border-radius: 3px 10px 10px 3px;
+        box-shadow: 0 3px 10px rgba(10, 6, 2, 0.3);
+        font-size: 0.78rem; color: #6e4f22;
+        transform: rotate(0.4deg);
+        animation: alertIn 0.4s ease;
+      }
+      @keyframes alertIn {
+        from { opacity: 0; transform: translateX(-10px) rotate(0.4deg); }
+        to { opacity: 1; transform: translateX(0) rotate(0.4deg); }
+      }
+
       #toast {
         position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-8px);
         z-index: 11;
-        padding: 9px 18px;
-        background: rgba(38, 30, 18, 0.78);
-        border: 1px solid rgba(255, 225, 160, 0.22);
-        border-radius: 999px;
-        font-size: 0.85rem; color: #f5ecd8;
-        backdrop-filter: blur(10px);
+        padding: 9px 20px;
+        background: var(--paper);
+        border: 1px solid var(--paper-edge);
+        border-radius: 12px;
+        box-shadow: 0 4px 16px rgba(10, 6, 2, 0.35);
+        font-size: 0.84rem; color: var(--ink);
         opacity: 0; transition: opacity 0.4s, transform 0.4s;
         pointer-events: none;
         white-space: nowrap;
       }
       #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-      .chip.wide { width: auto; padding: 0 12px; font-size: 0.9rem; font-weight: 600; }
-
-      #alerts {
-        position: fixed; top: 122px; left: 22px; z-index: 10;
-        display: flex; flex-direction: column; gap: 6px;
-        max-width: 320px;
-      }
-      .alert {
-        padding: 8px 14px;
-        background: rgba(74, 50, 16, 0.72);
-        border: 1px solid rgba(255, 196, 110, 0.45);
-        border-radius: 12px;
-        font-size: 0.8rem; color: #ffe2b8;
-        backdrop-filter: blur(10px);
-        animation: alertIn 0.4s ease;
-      }
-      @keyframes alertIn {
-        from { opacity: 0; transform: translateX(-10px); }
-        to { opacity: 1; transform: translateX(0); }
-      }
-
-      .overlay {
-        position: fixed; inset: 0; z-index: 50;
-        display: none;
-        align-items: center; justify-content: center;
-        background: rgba(16, 11, 6, 0.55);
-        backdrop-filter: blur(4px);
-      }
-      .overlay.open { display: flex; }
-      .overlay-card {
-        position: relative;
-        width: min(560px, calc(100vw - 40px));
-        max-height: min(78vh, 700px);
-        overflow-y: auto;
-        padding: 30px 34px;
-        background: rgba(42, 33, 22, 0.92);
-        border: 1px solid rgba(255, 235, 195, 0.18);
-        border-radius: 20px;
-        backdrop-filter: blur(16px);
-        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
-      }
-      .overlay-card h2 {
-        font-family: 'Fraunces', serif; font-weight: 500;
-        font-size: 1.45rem; color: #f3e6c8; margin-bottom: 0.7rem;
-      }
-      .overlay-card h3 {
-        font-family: 'Fraunces', serif; font-weight: 500;
-        font-size: 1.05rem; color: #e8cf9e; margin: 1.2rem 0 0.35rem;
-      }
-      .overlay-card p {
-        font-size: 0.86rem; line-height: 1.55; color: rgba(240, 230, 210, 0.88);
-        margin-bottom: 0.4rem;
-      }
-      .overlay-card b { color: #f5e7c6; }
-      .overlay-close {
-        position: absolute; top: 14px; right: 16px;
-        width: 34px; height: 34px;
-        border: none; border-radius: 50%;
-        background: rgba(255, 235, 195, 0.1);
-        color: #f0e0c0; font-size: 1.3rem; line-height: 1;
-        cursor: pointer;
-      }
-      .overlay-close:hover { background: rgba(255, 235, 195, 0.22); }
-      .overlay-card .sub {
-        font-size: 0.78rem; color: rgba(232, 207, 158, 0.75);
-        margin: -0.4rem 0 0.8rem;
-      }
-      .overlay-card ul.away {
-        list-style: none; margin: 0.4rem 0 0.8rem;
-      }
-      .overlay-card ul.away li {
-        font-size: 0.88rem; line-height: 1.7; color: rgba(240, 230, 210, 0.9);
-      }
-      .journal-entry {
-        display: flex; gap: 12px; align-items: baseline;
-        padding: 7px 0;
-        border-bottom: 1px solid rgba(255, 235, 195, 0.08);
-        font-size: 0.84rem; color: rgba(240, 230, 210, 0.88);
-      }
-      .journal-entry .when {
-        flex: 0 0 86px;
-        font-size: 0.72rem; color: rgba(232, 207, 158, 0.65);
-        white-space: nowrap;
-      }
-      .fg-entry {
-        padding: 8px 0 4px;
-        border-bottom: 1px solid rgba(255, 235, 195, 0.07);
-      }
-      .fg-head { font-size: 0.9rem; color: #f3e6c8; margin-bottom: 0.15rem; }
-      .fg-head .emoji { margin-right: 6px; }
-      .fg-head i { color: rgba(232, 207, 158, 0.85); font-size: 0.82rem; margin-left: 4px; }
-      .fg-fam {
-        font-size: 0.68rem; color: rgba(240, 230, 210, 0.5);
-        margin-left: 6px; letter-spacing: 0.06em;
-      }
-      .fg-entry p { font-size: 0.82rem; }
-      .fg-care { color: rgba(232, 207, 158, 0.8) !important; font-size: 0.76rem !important; }
-      .fg-wet { font-family: monospace; font-size: 0.7rem; letter-spacing: 0.05em; }
-
-      #topbar {
-        position: fixed; top: 18px; right: 18px; z-index: 10;
-        display: flex; gap: 10px;
-      }
-      .seg {
-        display: flex; gap: 4px; padding: 5px;
-        background: rgba(28, 22, 14, 0.55);
-        border: 1px solid rgba(255, 245, 220, 0.12);
-        border-radius: 14px;
-        backdrop-filter: blur(12px);
-      }
-      .chip {
-        width: 40px; height: 40px;
-        border: none; border-radius: 10px;
-        background: transparent;
-        color: #f0e9dc; font-size: 1.15rem;
-        cursor: pointer;
-        transition: background 0.15s;
-      }
-      .chip:hover { background: rgba(255, 245, 220, 0.12); }
-      .chip.active { background: rgba(255, 215, 140, 0.22); }
-
-      #toolbar {
-        position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
-        z-index: 10;
-        display: flex; gap: 14px; align-items: flex-end;
-        padding: 10px 14px;
-        background: rgba(28, 22, 14, 0.55);
-        border: 1px solid rgba(255, 245, 220, 0.12);
-        border-radius: 18px;
-        backdrop-filter: blur(12px);
-        max-width: calc(100vw - 24px);
-        overflow-x: auto;
-        scrollbar-width: none;
-      }
-      #toolbar::-webkit-scrollbar { display: none; }
-      .group-title {
-        font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase;
-        color: rgba(240, 233, 220, 0.5);
-        margin: 0 0 6px 4px; height: 0.8em;
-      }
-      .row { display: flex; gap: 4px; flex-wrap: wrap; max-width: 420px; justify-content: center; }
-      .tool {
-        display: flex; flex-direction: column; align-items: center; gap: 3px;
-        min-width: 50px; padding: 7px 5px 5px;
-        border: none; border-radius: 12px;
-        background: transparent; color: #f0e9dc;
-        cursor: pointer;
-        transition: background 0.15s, transform 0.1s;
-      }
-      .tool:hover { background: rgba(255, 245, 220, 0.1); }
-      .tool.active { background: rgba(255, 215, 140, 0.22); }
-      .tool:active { transform: scale(0.96); }
-      .tool .emoji { font-size: 1.25rem; line-height: 1.3rem; }
-      .tool .swatch {
-        width: 20px; height: 20px; border-radius: 50%;
-        margin: 0.05rem 0;
-        border: 2px solid rgba(255, 255, 255, 0.35);
-        box-shadow: inset 0 -3px 5px rgba(0,0,0,0.25);
-      }
-      .tool label { font-size: 0.66rem; color: rgba(240, 233, 220, 0.85); pointer-events: none; }
-
       #hint {
-        position: fixed; bottom: 112px; left: 50%; transform: translateX(-50%);
+        position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
         z-index: 9;
-        padding: 8px 16px;
-        background: rgba(28, 22, 14, 0.65);
-        border: 1px solid rgba(255, 245, 220, 0.1);
+        padding: 8px 18px;
+        background: var(--paper);
+        border: 1px solid var(--paper-edge);
         border-radius: 999px;
-        font-size: 0.8rem; color: rgba(240, 233, 220, 0.9);
-        backdrop-filter: blur(8px);
+        box-shadow: 0 4px 14px rgba(10, 6, 2, 0.3);
+        font-size: 0.78rem; color: var(--ink-soft);
         opacity: 0; transition: opacity 0.3s;
         pointer-events: none;
         white-space: nowrap;
       }
       #hint.show { opacity: 1; }
 
+      /* ---- the journal: a little book docked on the right ---- */
+      #book {
+        position: fixed; right: 16px; top: 50%;
+        transform: translateY(-50%);
+        z-index: 20;
+        display: flex; align-items: stretch;
+        width: 354px;
+        height: min(88vh, 690px);
+        transition: transform 0.4s cubic-bezier(0.3, 0.9, 0.3, 1), opacity 0.3s;
+        filter: drop-shadow(0 16px 34px rgba(8, 5, 2, 0.5));
+      }
+      #book.closed {
+        transform: translateY(-50%) translateX(400px);
+        opacity: 0;
+        pointer-events: none;
+      }
+      #book-tabs {
+        display: flex; flex-direction: column; gap: 7px;
+        padding-top: 30px;
+        z-index: 1;
+      }
+      .btab {
+        display: flex; flex-direction: column; align-items: center; gap: 1px;
+        width: 46px; padding: 9px 4px 7px;
+        border: 1px solid var(--paper-edge); border-right: none;
+        border-radius: 10px 0 0 10px;
+        background: var(--paper-deep);
+        color: var(--ink-soft);
+        cursor: pointer;
+        transition: transform 0.18s, background 0.18s;
+        box-shadow: -3px 3px 8px rgba(10, 6, 2, 0.18);
+      }
+      .btab .em { font-size: 1.05rem; line-height: 1.2; }
+      .btab label { font-size: 0.5rem; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; }
+      .btab:hover { transform: translateX(-3px); }
+      .btab.active {
+        background: var(--paper);
+        color: var(--ink);
+        transform: translateX(-4px);
+        font-weight: 600;
+      }
+      #book-pages {
+        flex: 1;
+        background:
+          radial-gradient(ellipse at 18% 8%, rgba(255, 252, 240, 0.7), transparent 55%),
+          linear-gradient(105deg, var(--paper-deep) 0%, var(--paper) 7%, var(--paper) 100%);
+        border: 1px solid var(--paper-edge);
+        border-radius: 5px 16px 16px 5px;
+        box-shadow: inset 4px 0 10px -5px rgba(96, 70, 38, 0.45);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding: 20px 20px 26px 22px;
+        scrollbar-width: thin;
+        scrollbar-color: var(--paper-edge) transparent;
+      }
+      #book-pages::-webkit-scrollbar { width: 8px; }
+      #book-pages::-webkit-scrollbar-thumb { background: var(--paper-edge); border-radius: 8px; }
+
+      .bpage { display: none; }
+      .bpage.active { display: block; animation: pageIn 0.25s ease; }
+      @keyframes pageIn {
+        from { opacity: 0; transform: translateY(5px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .bpage h2 {
+        font-family: 'Fraunces', serif; font-weight: 600;
+        font-size: 1.3rem; color: var(--ink); margin-bottom: 0.15rem;
+      }
+      .bpage .sub {
+        font-size: 0.74rem; color: var(--ink-faint); margin-bottom: 0.9rem;
+        font-style: italic;
+      }
+      .bpage h3 {
+        font-family: 'Fraunces', serif; font-weight: 500;
+        font-size: 0.98rem; color: var(--accent); margin: 1.1rem 0 0.4rem;
+        border-bottom: 1px dashed var(--paper-edge); padding-bottom: 3px;
+      }
+      .bpage p { font-size: 0.83rem; line-height: 1.55; color: var(--ink); margin-bottom: 0.45rem; }
+      .bpage b { color: #3c2c18; }
+
+      /* sticker-style tool buttons */
+      .row { display: flex; gap: 7px; flex-wrap: wrap; }
+      .tool {
+        display: flex; flex-direction: column; align-items: center; gap: 2px;
+        width: calc(25% - 6px); padding: 8px 2px 6px;
+        border: 1.5px solid var(--paper-edge); border-radius: 11px;
+        background: #fffcf1;
+        color: var(--ink);
+        cursor: pointer;
+        transition: transform 0.13s, border-color 0.15s, background 0.15s;
+        box-shadow: 0 2px 5px rgba(96, 70, 38, 0.13);
+      }
+      .tool:nth-child(2n) { transform: rotate(0.7deg); }
+      .tool:nth-child(2n + 1) { transform: rotate(-0.7deg); }
+      .tool:hover { background: #fff6dd; transform: rotate(0deg) scale(1.05); }
+      .tool.active {
+        border-color: var(--accent);
+        background: #ffe9cd;
+        transform: rotate(0deg) scale(1.05);
+        box-shadow: 0 3px 9px rgba(150, 84, 32, 0.3);
+      }
+      .tool:active { transform: scale(0.96); }
+      .tool .emoji { font-size: 1.2rem; line-height: 1.35rem; }
+      .tool .swatch {
+        width: 19px; height: 19px; border-radius: 50%;
+        margin: 0.1rem 0;
+        border: 2px solid rgba(96, 70, 38, 0.4);
+        box-shadow: inset 0 -3px 5px rgba(0,0,0,0.25);
+      }
+      .tool label { font-size: 0.6rem; color: var(--ink-soft); pointer-events: none; }
+
+      /* studio rows (settings page) */
+      .srow {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 9px 0;
+        border-bottom: 1px dashed var(--paper-edge);
+        font-size: 0.84rem;
+      }
+      .srow .lbl { color: var(--ink); }
+      .seg { display: flex; gap: 4px; }
+      .chip {
+        min-width: 35px; height: 35px; padding: 0 8px;
+        border: 1.5px solid var(--paper-edge); border-radius: 10px;
+        background: #fffcf1;
+        color: var(--ink); font-size: 1rem;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
+        box-shadow: 0 2px 4px rgba(96, 70, 38, 0.12);
+      }
+      .chip:hover { background: #fff6dd; }
+      .chip.active { border-color: var(--accent); background: #ffe9cd; }
+      .chip.wide { font-size: 0.85rem; font-weight: 600; }
+
+      /* the bookmark that opens the journal when it's tucked away */
+      #book-toggle {
+        position: fixed; right: 0; top: 50%;
+        transform: translateY(-50%);
+        z-index: 21;
+        width: 44px; height: 92px;
+        border: 1px solid var(--paper-edge); border-right: none;
+        border-radius: 12px 0 0 12px;
+        background: linear-gradient(135deg, #c0703f, #a85a30);
+        color: #f8ecd4; font-size: 1.25rem;
+        cursor: pointer;
+        box-shadow: -4px 4px 14px rgba(8, 5, 2, 0.4);
+        transition: width 0.2s;
+      }
+      #book-toggle:hover { width: 52px; }
+
+      /* journal + field guide content (inside book pages) */
+      .journal-entry {
+        display: flex; gap: 10px; align-items: baseline;
+        padding: 6px 0;
+        border-bottom: 1px dashed var(--paper-edge);
+        font-size: 0.8rem; color: var(--ink);
+      }
+      .journal-entry .when {
+        flex: 0 0 84px;
+        font-size: 0.68rem; color: var(--ink-faint);
+        white-space: nowrap;
+      }
+      .fg-entry {
+        padding: 8px 0 4px;
+        border-bottom: 1px dashed var(--paper-edge);
+      }
+      .fg-head { font-size: 0.88rem; color: var(--ink); margin-bottom: 0.15rem; }
+      .fg-head .emoji { margin-right: 5px; }
+      .fg-head i { color: var(--ink-soft); font-size: 0.79rem; margin-left: 3px; }
+      .fg-fam {
+        font-size: 0.64rem; color: var(--ink-faint);
+        margin-left: 5px; letter-spacing: 0.06em;
+      }
+      .fg-entry p { font-size: 0.79rem; }
+      .fg-care { color: var(--accent) !important; font-size: 0.73rem !important; }
+      .fg-wet { font-family: monospace; font-size: 0.68rem; letter-spacing: 0.04em; color: var(--ink-soft); }
+
+      /* rare modal (welcome back) — a loose page of the same paper */
+      .overlay {
+        position: fixed; inset: 0; z-index: 50;
+        display: none;
+        align-items: center; justify-content: center;
+        background: rgba(14, 10, 5, 0.55);
+        backdrop-filter: blur(4px);
+      }
+      .overlay.open { display: flex; }
+      .overlay-card {
+        position: relative;
+        width: min(520px, calc(100vw - 40px));
+        max-height: min(78vh, 660px);
+        overflow-y: auto;
+        padding: 30px 34px;
+        background:
+          radial-gradient(ellipse at 20% 8%, rgba(255, 252, 240, 0.8), transparent 55%),
+          var(--paper);
+        border: 1px solid var(--paper-edge);
+        border-radius: 6px 18px 18px 6px;
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+        transform: rotate(-0.4deg);
+      }
+      .overlay-card h2 {
+        font-family: 'Fraunces', serif; font-weight: 600;
+        font-size: 1.4rem; color: var(--ink); margin-bottom: 0.5rem;
+      }
+      .overlay-card h3 {
+        font-family: 'Fraunces', serif; font-weight: 500;
+        font-size: 1.02rem; color: var(--accent); margin: 1.1rem 0 0.35rem;
+      }
+      .overlay-card p {
+        font-size: 0.85rem; line-height: 1.55; color: var(--ink);
+        margin-bottom: 0.4rem;
+      }
+      .overlay-card b { color: #3c2c18; }
+      .overlay-card .sub {
+        font-size: 0.76rem; color: var(--ink-faint);
+        margin: -0.3rem 0 0.8rem; font-style: italic;
+      }
+      .overlay-card ul.away { list-style: none; margin: 0.4rem 0 0.8rem; }
+      .overlay-card ul.away li { font-size: 0.86rem; line-height: 1.7; color: var(--ink); }
+      .overlay-close {
+        position: absolute; top: 12px; right: 14px;
+        width: 32px; height: 32px;
+        border: 1px solid var(--paper-edge); border-radius: 50%;
+        background: #fffcf1;
+        color: var(--ink-soft); font-size: 1.2rem; line-height: 1;
+        cursor: pointer;
+      }
+      .overlay-close:hover { background: #fff0d6; }
+
       @media (max-width: 760px) {
-        .tool { min-width: 46px; }
-        .tool label { font-size: 0.6rem; }
+        #book { width: min(330px, 92vw); height: min(82vh, 640px); right: 8px; }
+        .tool { width: calc(33.4% - 6px); }
         #brand span { display: none; }
+        #stats { font-size: 0.72rem; gap: 8px; }
       }
     </style>
   </head>

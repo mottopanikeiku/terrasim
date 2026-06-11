@@ -1,9 +1,18 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { TANK_W, TANK_H } from './constants';
 
 export type PresetName = 'day' | 'golden' | 'night';
+
+// The art direction: a lamplit miniature. The room stays quiet and falls
+// away; light concentrates inside the glass. Bloom makes highlights and
+// the night fungi glow; a tilt-shift blur band makes the tank read tiny;
+// a final grade warms the golden hour and cools the night.
 
 interface LightState {
   sunColor: THREE.Color;
@@ -17,13 +26,23 @@ interface LightState {
   bgBot: THREE.Color;
   exposure: number;
   lampIntensity: number;
+  spotIntensity: number;
+  glowOpacity: number;   // sun patch on the back wall
+  shaftOpacity: number;  // volumetric light shafts
+  bloom: number;
+  tilt: number;          // tilt-shift blur strength
+  vignette: number;
+  saturation: number;
+  tint: THREE.Color;     // final grade multiply
 }
 
 function state(p: {
   sunColor: number; sunIntensity: number; sunPos: [number, number, number];
   hemiSky: number; hemiGround: number; hemiIntensity: number;
   bgTop: number; bgMid: number; bgBot: number;
-  exposure: number; lampIntensity: number;
+  exposure: number; lampIntensity: number; spotIntensity: number;
+  glowOpacity: number; shaftOpacity: number;
+  bloom: number; tilt: number; vignette: number; saturation: number; tint: number;
 }): LightState {
   return {
     sunColor: new THREE.Color(p.sunColor),
@@ -37,28 +56,107 @@ function state(p: {
     bgBot: new THREE.Color(p.bgBot),
     exposure: p.exposure,
     lampIntensity: p.lampIntensity,
+    spotIntensity: p.spotIntensity,
+    glowOpacity: p.glowOpacity,
+    shaftOpacity: p.shaftOpacity,
+    bloom: p.bloom,
+    tilt: p.tilt,
+    vignette: p.vignette,
+    saturation: p.saturation,
+    tint: new THREE.Color(p.tint),
   };
 }
 
 const PRESETS: Record<PresetName, LightState> = {
   day: state({
-    sunColor: 0xfff6e8, sunIntensity: 4.0, sunPos: [10, 18, 8],
-    hemiSky: 0xcfe4f5, hemiGround: 0x8a7560, hemiIntensity: 0.9,
-    bgTop: 0xcdbb9e, bgMid: 0xb19b78, bgBot: 0x8a7355,
-    exposure: 1.15, lampIntensity: 0,
+    sunColor: 0xfff6e8, sunIntensity: 3.2, sunPos: [10, 18, 8],
+    hemiSky: 0xcfe4f5, hemiGround: 0x8a7560, hemiIntensity: 0.75,
+    bgTop: 0xa39477, bgMid: 0x877357, bgBot: 0x64523c,
+    exposure: 1.12, lampIntensity: 0, spotIntensity: 520,
+    glowOpacity: 0.14, shaftOpacity: 0.09,
+    bloom: 0.16, tilt: 0.5, vignette: 0.32, saturation: 1.03, tint: 0xfffbf5,
   }),
   golden: state({
-    sunColor: 0xffc77d, sunIntensity: 4.2, sunPos: [14, 9, 10],
-    hemiSky: 0xe8c49a, hemiGround: 0x84684a, hemiIntensity: 0.85,
-    bgTop: 0xd6b181, bgMid: 0xb38a55, bgBot: 0x7d5836,
-    exposure: 1.2, lampIntensity: 0,
+    sunColor: 0xffce8c, sunIntensity: 3.1, sunPos: [7, 13, 14],
+    hemiSky: 0xd6bd9c, hemiGround: 0x9a7a55, hemiIntensity: 1.0,
+    bgTop: 0x9b855f, bgMid: 0x7a6143, bgBot: 0x54402b,
+    exposure: 1.16, lampIntensity: 0, spotIntensity: 750,
+    glowOpacity: 0.22, shaftOpacity: 0.13,
+    bloom: 0.24, tilt: 0.55, vignette: 0.36, saturation: 1.04, tint: 0xfff6ea,
   }),
   night: state({
-    sunColor: 0x9db4dd, sunIntensity: 0.7, sunPos: [-8, 16, -6],
-    hemiSky: 0x3c4a66, hemiGround: 0x1c1a18, hemiIntensity: 0.45,
-    bgTop: 0x2c3242, bgMid: 0x232633, bgBot: 0x191b24,
-    exposure: 1.0, lampIntensity: 26,
+    sunColor: 0x8aa4d4, sunIntensity: 0.35, sunPos: [-8, 16, -6],
+    hemiSky: 0x2c3850, hemiGround: 0x14120f, hemiIntensity: 0.22,
+    bgTop: 0x12151f, bgMid: 0x0e1016, bgBot: 0x0a0b10,
+    exposure: 1.0, lampIntensity: 30, spotIntensity: 750,
+    glowOpacity: 0, shaftOpacity: 0,
+    bloom: 0.7, tilt: 0.45, vignette: 0.5, saturation: 0.92, tint: 0xdfe6ff,
   }),
+};
+
+// Tilt-shift: separable blur whose strength grows away from a horizontal
+// focus band — the classic miniature-photography trick.
+const TiltShader = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    uDelta: { value: new THREE.Vector2(0, 0) },
+    uStrength: { value: 0.5 },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform vec2 uDelta;
+    uniform float uStrength;
+    varying vec2 vUv;
+    void main() {
+      float band = clamp((abs(vUv.y - 0.46) - 0.13) / 0.4, 0.0, 1.0);
+      float amt = band * band * uStrength;
+      vec2 d = uDelta * amt;
+      vec4 c = texture2D(tDiffuse, vUv) * 0.227;
+      c += (texture2D(tDiffuse, vUv + d * 1.385) + texture2D(tDiffuse, vUv - d * 1.385)) * 0.316;
+      c += (texture2D(tDiffuse, vUv + d * 3.231) + texture2D(tDiffuse, vUv - d * 3.231)) * 0.0703;
+      gl_FragColor = c;
+    }`,
+};
+
+// Final grade: saturation, warm/cool tint, vignette, faint film grain.
+const GradeShader = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    uVignette: { value: 0.35 },
+    uSaturation: { value: 1.05 },
+    uTint: { value: new THREE.Color(1, 1, 1) },
+    uTime: { value: 0 },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float uVignette;
+    uniform float uSaturation;
+    uniform vec3 uTint;
+    uniform float uTime;
+    varying vec2 vUv;
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    void main() {
+      vec3 c = texture2D(tDiffuse, vUv).rgb;
+      float luma = dot(c, vec3(0.299, 0.587, 0.114));
+      c = mix(vec3(luma), c, uSaturation);
+      c *= uTint;
+      vec2 q = vUv - vec2(0.5, 0.44);
+      c *= 1.0 - uVignette * smoothstep(0.32, 0.95, length(q * vec2(1.15, 1.0)));
+      c += (hash(vUv * 731.0 + uTime) - 0.5) * 0.018;
+      gl_FragColor = vec4(c, 1.0);
+    }`,
 };
 
 export class SceneManager {
@@ -70,9 +168,19 @@ export class SceneManager {
   private sun: THREE.DirectionalLight;
   private hemi: THREE.HemisphereLight;
   private lamp: THREE.PointLight;
+  private spot: THREE.SpotLight;
+  private glow: THREE.Sprite;
+  private shaftMats: THREE.MeshBasicMaterial[] = [];
   private bgUniforms: { topColor: { value: THREE.Color }; midColor: { value: THREE.Color }; bottomColor: { value: THREE.Color } };
   private current: LightState;
   private target: LightState;
+
+  private composer: EffectComposer;
+  private bloomPass: UnrealBloomPass;
+  private tiltH: ShaderPass;
+  private tiltV: ShaderPass;
+  private gradePass: ShaderPass;
+  private time = 0;
 
   constructor(container: HTMLElement) {
     this.camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 300);
@@ -92,7 +200,7 @@ export class SceneManager {
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     pmrem.dispose();
 
-    // Room backdrop: big gradient sphere, kept bright and warm.
+    // Room backdrop: big gradient sphere.
     this.bgUniforms = {
       topColor: { value: new THREE.Color() },
       midColor: { value: new THREE.Color() },
@@ -124,7 +232,7 @@ export class SceneManager {
     bg.renderOrder = -100;
     this.scene.add(bg);
 
-    // Soft sun-glow patch on the back wall — like late light through a window.
+    // Soft sun-glow patch on the back wall — late light through a window.
     const glowCanvas = document.createElement('canvas');
     glowCanvas.width = glowCanvas.height = 256;
     const gctx = glowCanvas.getContext('2d')!;
@@ -134,15 +242,37 @@ export class SceneManager {
     gg.addColorStop(1, 'rgba(255, 190, 120, 0)');
     gctx.fillStyle = gg;
     gctx.fillRect(0, 0, 256, 256);
-    const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+    this.glow = new THREE.Sprite(new THREE.SpriteMaterial({
       map: new THREE.CanvasTexture(glowCanvas),
       transparent: true,
       opacity: 0.55,
       depthWrite: false,
     }));
-    glow.position.set(-19, 15, -20.2);
-    glow.scale.set(30, 30, 1);
-    this.scene.add(glow);
+    this.glow.position.set(-15, 20, -20.2);
+    this.glow.scale.set(24, 24, 1);
+    this.scene.add(this.glow);
+
+    // Volumetric shafts: additive gradient planes slanting with the sun.
+    const shaftTex = SceneManager.makeShaftTexture();
+    const shaftGroup = new THREE.Group();
+    for (const [off, w, len] of [[-3.4, 2.2, 26], [0.2, 3.4, 28], [3.2, 1.7, 24]] as const) {
+      const mat = new THREE.MeshBasicMaterial({
+        map: shaftTex,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      this.shaftMats.push(mat);
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(w, len), mat);
+      plane.position.set(off * 1.4, 7.5, off);
+      plane.rotation.z = -0.62;
+      plane.rotation.y = 0.25;
+      plane.renderOrder = 6;
+      shaftGroup.add(plane);
+    }
+    this.scene.add(shaftGroup);
 
     // Lights
     this.sun = new THREE.DirectionalLight(0xffffff, 3);
@@ -162,10 +292,33 @@ export class SceneManager {
     this.hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
     this.scene.add(this.hemi);
 
-    // Warm desk lamp for night mode.
+    // Warm desk lamp for night mode (fills the room a little).
     this.lamp = new THREE.PointLight(0xffb066, 0, 30, 2);
     this.lamp.position.set(4, TANK_H + 4, 3);
     this.scene.add(this.lamp);
+
+    // Display spot: a warm cone aimed at the tank so it stays the bright
+    // jewel of the scene even as the room dims.
+    this.spot = new THREE.SpotLight(0xffe2b8, 0, 0, 0.62, 0.8, 1.25);
+    this.spot.position.set(-2, 18, 4);
+    this.spot.target.position.set(-1, 1.5, 0);
+    this.scene.add(this.spot);
+    this.scene.add(this.spot.target);
+
+    // Post stack: render -> bloom -> tilt-shift (H+V) -> grade.
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    this.composer.setSize(innerWidth, innerHeight);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.3, 0.55, 0.88);
+    this.composer.addPass(this.bloomPass);
+    this.tiltH = new ShaderPass(TiltShader);
+    this.tiltV = new ShaderPass(TiltShader);
+    this.composer.addPass(this.tiltH);
+    this.composer.addPass(this.tiltV);
+    this.gradePass = new ShaderPass(GradeShader);
+    this.composer.addPass(this.gradePass);
+    this.updateTiltDeltas();
 
     this.current = this.cloneState(PRESETS.golden);
     this.target = this.cloneState(PRESETS.golden);
@@ -194,6 +347,34 @@ export class SceneManager {
     addEventListener('resize', () => this.onResize());
   }
 
+  private static makeShaftTexture(): THREE.Texture {
+    const c = document.createElement('canvas');
+    c.width = 128;
+    c.height = 512;
+    const ctx = c.getContext('2d')!;
+    const lin = ctx.createLinearGradient(0, 0, 0, 512);
+    lin.addColorStop(0, 'rgba(255, 232, 180, 0.55)');
+    lin.addColorStop(0.6, 'rgba(255, 220, 160, 0.22)');
+    lin.addColorStop(1, 'rgba(255, 210, 150, 0)');
+    ctx.fillStyle = lin;
+    ctx.fillRect(0, 0, 128, 512);
+    // Soft horizontal falloff so the shaft has no hard edges.
+    const img = ctx.getImageData(0, 0, 128, 512);
+    for (let y = 0; y < 512; y++) {
+      for (let x = 0; x < 128; x++) {
+        const fall = Math.sin((x / 127) * Math.PI);
+        img.data[(y * 128 + x) * 4 + 3] *= fall * fall;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return new THREE.CanvasTexture(c);
+  }
+
+  private updateTiltDeltas(): void {
+    (this.tiltH.uniforms as any).uDelta.value.set(1 / innerWidth, 0);
+    (this.tiltV.uniforms as any).uDelta.value.set(0, 1 / innerHeight);
+  }
+
   private cloneState(s: LightState): LightState {
     return {
       sunColor: s.sunColor.clone(),
@@ -207,6 +388,14 @@ export class SceneManager {
       bgBot: s.bgBot.clone(),
       exposure: s.exposure,
       lampIntensity: s.lampIntensity,
+      spotIntensity: s.spotIntensity,
+      glowOpacity: s.glowOpacity,
+      shaftOpacity: s.shaftOpacity,
+      bloom: s.bloom,
+      tilt: s.tilt,
+      vignette: s.vignette,
+      saturation: s.saturation,
+      tint: s.tint.clone(),
     };
   }
 
@@ -248,9 +437,28 @@ export class SceneManager {
     this.bgUniforms.bottomColor.value.copy(s.bgBot);
     this.renderer.toneMappingExposure = s.exposure;
     this.lamp.intensity = s.lampIntensity;
+    this.spot.intensity = s.spotIntensity;
+    (this.glow.material as THREE.SpriteMaterial).opacity = s.glowOpacity;
+    for (let i = 0; i < this.shaftMats.length; i++) {
+      this.shaftMats[i].opacity = s.shaftOpacity * (i === 1 ? 1 : 0.7);
+    }
+    this.bloomPass.strength = s.bloom;
+    (this.tiltH.uniforms as any).uStrength.value = s.tilt;
+    (this.tiltV.uniforms as any).uStrength.value = s.tilt;
+    (this.gradePass.uniforms as any).uVignette.value = s.vignette;
+    (this.gradePass.uniforms as any).uSaturation.value = s.saturation;
+    (this.gradePass.uniforms as any).uTint.value.copy(s.tint);
+  }
+
+  // Render one frame through the full post stack (also used for photos).
+  renderFrame(): void {
+    this.composer.render();
   }
 
   update(dt: number): void {
+    this.time += dt;
+    (this.gradePass.uniforms as any).uTime.value = this.time % 97;
+
     if (this.auto) {
       const total = SceneManager.CYCLE.reduce((s, [, d]) => s + d, 0);
       this.cycleT = (this.cycleT + dt) % total;
@@ -264,8 +472,7 @@ export class SceneManager {
       }
     }
 
-    // Smooth exponential approach toward the target preset. Slower blend so
-    // the automatic cycle feels like drifting light, not a switch.
+    // Smooth exponential approach toward the target preset.
     const k = 1 - Math.exp(-(this.auto ? 0.5 : 3.5) * dt);
     const c = this.current, t = this.target;
     c.sunColor.lerp(t.sunColor, k);
@@ -279,10 +486,18 @@ export class SceneManager {
     c.bgBot.lerp(t.bgBot, k);
     c.exposure += (t.exposure - c.exposure) * k;
     c.lampIntensity += (t.lampIntensity - c.lampIntensity) * k;
+    c.spotIntensity += (t.spotIntensity - c.spotIntensity) * k;
+    c.glowOpacity += (t.glowOpacity - c.glowOpacity) * k;
+    c.shaftOpacity += (t.shaftOpacity - c.shaftOpacity) * k;
+    c.bloom += (t.bloom - c.bloom) * k;
+    c.tilt += (t.tilt - c.tilt) * k;
+    c.vignette += (t.vignette - c.vignette) * k;
+    c.saturation += (t.saturation - c.saturation) * k;
+    c.tint.lerp(t.tint, k);
     this.apply(c);
 
     this.controls.update();
-    this.renderer.render(this.scene, this.camera);
+    this.renderFrame();
   }
 
   // Fit the whole tank in view for any aspect ratio.
@@ -300,6 +515,8 @@ export class SceneManager {
     this.camera.aspect = innerWidth / innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(innerWidth, innerHeight);
+    this.composer.setSize(innerWidth, innerHeight);
+    this.updateTiltDeltas();
     this.frameTank();
   }
 }

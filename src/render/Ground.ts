@@ -24,7 +24,7 @@ const MAT_RANGE: Record<number, RangeName> = {
 const MAT_BRIGHT: Record<number, number> = {
   [Mat.GRAVEL]: 1.0,
   [Mat.SAND]: 1.08,
-  [Mat.SOIL]: 1.45,
+  [Mat.SOIL]: 1.6,
 };
 
 const MOSS_COL = new THREE.Color(0x6fae45).convertSRGBToLinear();

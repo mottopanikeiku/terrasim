@@ -100,7 +100,7 @@ function init(): void {
   ui.onSound = (on) => audio.setEnabled(on);
   room.onDrip = () => audio.plip();
   ui.onPhoto = () => {
-    sceneMgr.renderer.render(sceneMgr.scene, sceneMgr.camera);
+    sceneMgr.renderFrame();
     const a = document.createElement('a');
     a.href = sceneMgr.renderer.domElement.toDataURL('image/png');
     a.download = 'terrarium.png';
