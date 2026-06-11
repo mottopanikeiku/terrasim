@@ -1,8 +1,8 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 
 // Cosmetic pour stream: a sprinkle of falling particles between the
-// cursor and the ground while a pour is held. Pure feedback — the volume
-// itself goes straight into the heightfield — but it makes pouring FEEL
+// cursor and the ground while a pour is held. Pure feedback â€” the volume
+// itself goes straight into the heightfield â€” but it makes pouring FEEL
 // like pouring.
 
 const COUNT = 90;
@@ -47,7 +47,7 @@ export class PourStream {
   // Call every frame; tool is null when not pouring.
   set(tool: string | null, target: THREE.Vector3 | null, groundY: number): void {
     this.active = !!tool && !!target;
-    if (tool) this.mat.color.setHex(TOOL_COLOR[tool] ?? 0xd6bc8a).convertSRGBToLinear();
+    if (tool) this.mat.color.setHex(TOOL_COLOR[tool] ?? 0xd6bc8a);
     if (target) {
       this.origin.set(target.x, Math.max(groundY + 1.6, target.y + 1.4), target.z);
       this.groundY = groundY;

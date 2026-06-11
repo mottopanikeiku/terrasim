@@ -53,7 +53,7 @@ export class Litter {
         pos.setZ(i, Math.abs(pos.getX(i)) * 0.8 + (t - 0.5) * (t - 0.5) * 0.16); // curl
       }
       leaf.computeVertexNormals();
-      c.set(BROWNS[(lp.seed >>> 4) % BROWNS.length]).convertSRGBToLinear();
+      c.set(BROWNS[(lp.seed >>> 4) % BROWNS.length]);
       const colors = new Float32Array(pos.count * 3);
       for (let i = 0; i < pos.count; i++) {
         const f = 0.85 + ((lp.seed >>> (i % 8)) & 3) * 0.06;

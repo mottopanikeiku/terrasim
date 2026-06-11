@@ -120,12 +120,11 @@ export class UI {
     this.bookEl = root.querySelector('#book')!;
     this.pagesEl = root.querySelector('#book-pages')!;
 
-    // Bookmark <-> book toggling.
-    const toggle = root.querySelector('#book-toggle') as HTMLButtonElement;
-    toggle.addEventListener('click', () => this.openBook(true));
-    if (innerWidth < 900) this.bookEl.classList.add('closed');
+    // Bookmark <-> book toggling. The bookmark only shows when the book is
+    // tucked away; a dedicated ✕ tab closes it — no surprise toggles.
+    this.toggleEl = root.querySelector('#book-toggle') as HTMLButtonElement;
+    this.toggleEl.addEventListener('click', () => this.openBook(true));
 
-    // Tabs.
     const tabsEl = root.querySelector('#book-tabs')!;
     const tabDefs: [PageName, string, string][] = [
       ['tools', '\u{1F331}', 'Tools'],
@@ -145,15 +144,12 @@ export class UI {
       this.tabs.set(name, b);
       tabsEl.appendChild(b);
     }
-    // Closing: clicking the active tab tucks the book away.
-    for (const [name, b] of this.tabs) {
-      b.addEventListener('click', () => {
-        if (b.classList.contains('was-active')) this.openBook(false);
-        this.tabs.forEach((tb) => tb.classList.remove('was-active'));
-        b.classList.add('was-active');
-        void name;
-      });
-    }
+    const closeTab = document.createElement('button');
+    closeTab.className = 'btab btab-close';
+    closeTab.title = 'Tuck the journal away';
+    closeTab.innerHTML = `<span class="em">\u{2715}</span>`;
+    closeTab.addEventListener('click', () => this.openBook(false));
+    tabsEl.appendChild(closeTab);
 
     this.buildToolsPage();
     this.buildGuidePage();
@@ -161,14 +157,17 @@ export class UI {
     this.buildHelpPage();
     this.buildStudioPage();
     this.setPage('tools');
+    this.openBook(innerWidth >= 900);
 
     this.selectTool('water');
     this.hint('Hold left mouse to pour · right-drag to orbit · scroll to zoom', 8000);
   }
 
+  private toggleEl!: HTMLButtonElement;
+
   private openBook(open: boolean): void {
     this.bookEl.classList.toggle('closed', !open);
-    if (!open) this.tabs.forEach((tb) => tb.classList.remove('was-active'));
+    this.toggleEl.style.display = open ? 'none' : '';
   }
 
   private setPage(name: PageName): void {
@@ -210,7 +209,10 @@ export class UI {
         btn.addEventListener('click', () => {
           this.selectTool(t.id);
           this.onTool?.(t.id);
-          this.hint(t.hint, 4000);
+          // Tuck the book away so the tank is clickable immediately —
+          // the open book would otherwise eat the pour clicks.
+          this.openBook(false);
+          this.hint(t.hint, 4500);
         });
         this.buttons.set(t.id, btn);
         row.appendChild(btn);
@@ -373,7 +375,7 @@ export class UI {
       this.buttons.set(`preset-${name}`, btn);
       seg.appendChild(btn);
     }
-    this.buttons.get('preset-golden')!.classList.add('active');
+    this.buttons.get('preset-day')!.classList.add('active');
     timeRow.appendChild(seg);
 
     // Pace.

@@ -67,30 +67,33 @@ function state(p: {
   };
 }
 
+// Honest naturalist light: a bright room near a window. The post stack
+// stays subtle — a touch of miniature tilt and sparkle, never "display
+// case". Drama is reserved for night, and even that is just a desk lamp.
 const PRESETS: Record<PresetName, LightState> = {
   day: state({
-    sunColor: 0xfff6e8, sunIntensity: 3.2, sunPos: [10, 18, 8],
-    hemiSky: 0xcfe4f5, hemiGround: 0x8a7560, hemiIntensity: 0.75,
-    bgTop: 0xa39477, bgMid: 0x877357, bgBot: 0x64523c,
-    exposure: 1.12, lampIntensity: 0, spotIntensity: 520,
-    glowOpacity: 0.14, shaftOpacity: 0.09,
-    bloom: 0.16, tilt: 0.5, vignette: 0.32, saturation: 1.03, tint: 0xfffbf5,
+    sunColor: 0xfff6e8, sunIntensity: 3.6, sunPos: [9, 19, 9],
+    hemiSky: 0xdcebf5, hemiGround: 0x9c8a72, hemiIntensity: 1.05,
+    bgTop: 0xcfc4ae, bgMid: 0xb6a890, bgBot: 0x968871,
+    exposure: 1.12, lampIntensity: 0, spotIntensity: 0,
+    glowOpacity: 0, shaftOpacity: 0.05,
+    bloom: 0.12, tilt: 0.35, vignette: 0.2, saturation: 1.02, tint: 0xffffff,
   }),
   golden: state({
-    sunColor: 0xffce8c, sunIntensity: 3.1, sunPos: [7, 13, 14],
-    hemiSky: 0xd6bd9c, hemiGround: 0x9a7a55, hemiIntensity: 1.0,
-    bgTop: 0x9b855f, bgMid: 0x7a6143, bgBot: 0x54402b,
-    exposure: 1.16, lampIntensity: 0, spotIntensity: 750,
-    glowOpacity: 0.22, shaftOpacity: 0.13,
-    bloom: 0.24, tilt: 0.55, vignette: 0.36, saturation: 1.04, tint: 0xfff6ea,
+    sunColor: 0xffd9a0, sunIntensity: 3.2, sunPos: [12, 11, 12],
+    hemiSky: 0xe2cfae, hemiGround: 0x97805f, hemiIntensity: 0.9,
+    bgTop: 0xc4ae8b, bgMid: 0xa68c66, bgBot: 0x83694a,
+    exposure: 1.14, lampIntensity: 0, spotIntensity: 0,
+    glowOpacity: 0.25, shaftOpacity: 0.12,
+    bloom: 0.2, tilt: 0.4, vignette: 0.26, saturation: 1.05, tint: 0xfff7ec,
   }),
   night: state({
-    sunColor: 0x8aa4d4, sunIntensity: 0.35, sunPos: [-8, 16, -6],
-    hemiSky: 0x2c3850, hemiGround: 0x14120f, hemiIntensity: 0.22,
-    bgTop: 0x12151f, bgMid: 0x0e1016, bgBot: 0x0a0b10,
-    exposure: 1.0, lampIntensity: 30, spotIntensity: 750,
+    sunColor: 0x8aa4d4, sunIntensity: 0.4, sunPos: [-8, 16, -6],
+    hemiSky: 0x44506b, hemiGround: 0x1c1916, hemiIntensity: 0.32,
+    bgTop: 0x191d28, bgMid: 0x14161e, bgBot: 0x0e0f14,
+    exposure: 1.0, lampIntensity: 32, spotIntensity: 260,
     glowOpacity: 0, shaftOpacity: 0,
-    bloom: 0.7, tilt: 0.45, vignette: 0.5, saturation: 0.92, tint: 0xdfe6ff,
+    bloom: 0.5, tilt: 0.38, vignette: 0.34, saturation: 0.95, tint: 0xe6ebff,
   }),
 };
 
@@ -320,8 +323,8 @@ export class SceneManager {
     this.composer.addPass(this.gradePass);
     this.updateTiltDeltas();
 
-    this.current = this.cloneState(PRESETS.golden);
-    this.target = this.cloneState(PRESETS.golden);
+    this.current = this.cloneState(PRESETS.day);
+    this.target = this.cloneState(PRESETS.day);
     this.apply(this.current);
 
     // Controls: LEFT is reserved for tools; orbit with right-drag.
@@ -399,15 +402,15 @@ export class SceneManager {
     };
   }
 
-  currentPreset: PresetName = 'golden';
+  currentPreset: PresetName = 'day';
   onPresetShift?: (p: PresetName) => void;
 
-  // The room breathes on its own: golden morning -> day -> golden evening
-  // -> night, over ~7.5 minutes. Picking a preset by hand pauses the drift.
+  // The room breathes on its own: day -> golden evening -> night -> golden
+  // morning, over ~7.5 minutes. Picking a preset by hand pauses the drift.
   private auto = true;
   private cycleT = 0;
   private static CYCLE: [PresetName, number][] = [
-    ['golden', 75], ['day', 150], ['golden', 75], ['night', 150],
+    ['day', 180], ['golden', 75], ['night', 140], ['golden', 55],
   ];
 
   setPreset(name: PresetName): void {

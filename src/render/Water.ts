@@ -12,8 +12,8 @@ const VX = W + 1;
 const VZ = D + 1;
 const NV = VX * VZ;
 
-const SHALLOW = new THREE.Color(0xaadcec).convertSRGBToLinear();
-const DEEP = new THREE.Color(0x3a7dab).convertSRGBToLinear();
+const SHALLOW = new THREE.Color(0xaadcec);
+const DEEP = new THREE.Color(0x3a7dab);
 
 const SKIRT_MAX = 1200; // glass-side quads
 
