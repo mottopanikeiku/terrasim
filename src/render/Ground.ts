@@ -19,16 +19,16 @@ const MAT_RANGE: Record<number, RangeName> = {
   [Mat.SOIL]: 'soil',
 };
 
-// The palette was tuned for tiny voxel grains; big smooth sheets need the
-// soil lifted toward warm umber or the plateau reads as a black mass.
+// Gentle per-material grading on top of the (now correctly converted)
+// palette: a touch of lift on soil keeps it friendly rather than grim.
 const MAT_BRIGHT: Record<number, number> = {
   [Mat.GRAVEL]: 1.0,
-  [Mat.SAND]: 1.08,
-  [Mat.SOIL]: 1.6,
+  [Mat.SAND]: 1.0,
+  [Mat.SOIL]: 1.12,
 };
 
-const MOSS_COL = new THREE.Color(0x6fae45).convertSRGBToLinear();
-const MOSS_COL2 = new THREE.Color(0x569636).convertSRGBToLinear();
+const MOSS_COL = new THREE.Color(0x6fae45);
+const MOSS_COL2 = new THREE.Color(0x569636);
 
 // Stable per-column material color (hash-picked shade, no flicker).
 function colShade(range: RangeName, x: number, z: number): THREE.Color {

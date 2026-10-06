@@ -1,15 +1,11 @@
 import { W, D, V } from './constants';
 import { Plant, Species, SPECIES } from '../world/Plants';
 
-// The idealized core: the tank is a LAYERED HEIGHTFIELD, not a voxel soup.
-// Each of the 144x60 columns holds a little stack of strata (gravel, sand,
-// soil — true stratigraphy, visible in the cross-section), a water depth,
-// a moisture value and a moss coverage. Pouring adds smooth volume that
-// relaxes to the material's angle of repose; water is a shallow-water sim
-// that visibly flows downhill and settles mirror-flat. The state is ~9k
-// columns instead of 518k cells: the whole tick costs well under a
-// millisecond, terrain and water are always smooth, and nothing can ever
-// strand a lonely blue cube again.
+// Layered heightfield: each terrain column stores substrate strata,
+// water depth, moisture, and moss coverage. Granular material relaxes
+// downhill according to hand-tuned slope thresholds; water volume moves
+// between neighbors toward equal surface heights. These are visual
+// simulation rules, not a calibrated soil or fluid model.
 
 export const N = W * D;
 export const MAXS = 6; // strata segments per column
@@ -324,8 +320,7 @@ export class World {
     }
   }
 
-  // Shallow-water: exchange volume toward equal surface heights. Pours
-  // visibly run downhill, ponds settle glassy-flat within a second.
+  // Exchange water volume toward equal surface heights.
   private flowWater(): void {
     const fwd = this.sweep === 0;
     for (let z = 0; z < D; z++) {

@@ -17,15 +17,17 @@ export class Aquarium {
     // would make the pond invisible through the walls. Flat panes barely
     // refract anyway, so alpha-blended glass with strong reflections reads
     // just as real.
+    // Quiet, clean glass: visible enough to read as a vessel, never shiny
+    // enough to read as a display case.
     const glass = new THREE.MeshPhysicalMaterial({
       color: 0xf4fbf7,
       transparent: true,
-      opacity: 0.085,
-      roughness: 0.04,
+      opacity: 0.055,
+      roughness: 0.06,
       metalness: 0.0,
-      envMapIntensity: 0.95,
-      clearcoat: 1.0,
-      clearcoatRoughness: 0.06,
+      envMapIntensity: 0.45,
+      clearcoat: 0.5,
+      clearcoatRoughness: 0.12,
       side: THREE.DoubleSide,
       depthWrite: false,
     });
@@ -36,8 +38,8 @@ export class Aquarium {
         '#include <dithering_fragment>',
         `#include <dithering_fragment>
         float fres = pow(1.0 - abs(dot(normalize(vViewPosition), normalize(vNormal))), 3.5);
-        gl_FragColor.rgb += vec3(1.0, 0.94, 0.82) * fres * 0.07;
-        gl_FragColor.a = min(1.0, gl_FragColor.a + fres * 0.1);`
+        gl_FragColor.rgb += vec3(1.0, 0.96, 0.88) * fres * 0.045;
+        gl_FragColor.a = min(1.0, gl_FragColor.a + fres * 0.06);`
       );
     };
 

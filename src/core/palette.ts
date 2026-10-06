@@ -19,7 +19,8 @@ function range(hexes: number[]): PaletteRange {
 
 export const RANGES = {
   sand: range([0xd6bc8a, 0xcdb280, 0xc4a878, 0xdcc394, 0xc9ae7d, 0xd1b685, 0xbfa472, 0xe0c89a]),
-  soil: range([0x5a4332, 0x66503a, 0x4d3a29, 0x6e5540, 0x574230, 0x624c37, 0x523d2a, 0x6a523c]),
+  // Warm, friendly potting earth — readable at a glance in daylight.
+  soil: range([0x7d5e40, 0x8a6a4b, 0x6f5338, 0x927251, 0x775a3d, 0x856548, 0x6a4f35, 0x9a7a58]),
   gravel: range([0x9a948c, 0x857f78, 0xa8a29a, 0x78736d, 0x8f8a85, 0xb0a89e, 0x6e6a66, 0x97928d]),
   rock: range([0x7d7a74, 0x8c8881, 0x6b6862, 0x9b968e, 0x76726b, 0x84807a]),
   water: range([0x7ec3e8, 0x8acbed, 0x74bbe2, 0x82c5ea]),
@@ -40,10 +41,11 @@ export const RANGES = {
 
 export type RangeName = keyof typeof RANGES;
 
-// Linear-space colors indexed by palette byte (materials expect linear).
-export const PALETTE: THREE.Color[] = entries.map((hex) =>
-  new THREE.Color(hex).convertSRGBToLinear()
-);
+// Colors indexed by palette byte. new Color(hex) already converts sRGB to
+// the linear working space under three's color management — calling
+// convertSRGBToLinear() on top DOUBLE-converts, crushing dark colors ~6x.
+// (That bug made soil render near-black through three renderer rewrites.)
+export const PALETTE: THREE.Color[] = entries.map((hex) => new THREE.Color(hex));
 
 export function randomShade(name: RangeName, rand: () => number = Math.random): number {
   const r = RANGES[name];
