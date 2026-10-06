@@ -24,7 +24,7 @@ nice -n 19 npm run build
 
 Open the local URL printed by Vite. Use the journal's tools to pour substrate and water or place plants; drag to orbit and scroll to zoom. Lighting, simulation speed, sound, and photo controls are in the interface. Your tank stays in this browser's local storage; reset replaces it with the opening landscape.
 
-A desktop or laptop with a WebGL-capable browser is needed. No server, model download, API key, or paid compute is required; running locally has no service charge. Minimum hardware and mobile performance have not been measured. Builds on the shared review machine use its `pp-run heavy` wrapper; no frame-rate benchmark is claimed.
+A desktop or laptop with a WebGL-capable browser is needed. No server, model download, API key, or paid compute is required; running locally has no service charge. Minimum hardware and mobile performance have not been measured, and no frame-rate benchmark is claimed.
 
 ## Limitations
 
