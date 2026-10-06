@@ -1,3 +1,8 @@
+> Historical design brief, retained for context. This is an early proposal,
+> not a description of the current application or evidence that its targets
+> were met. Several planned features and file names below were never shipped.
+> See the repository README and current source for implemented behavior.
+
 # Voxel Terrarium Builder
 
 ## Project Vision
