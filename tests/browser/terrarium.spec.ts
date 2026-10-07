@@ -2,12 +2,42 @@ import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import type {} from '../../src/main';
 
+// Software WebGL is expensive. Draw a few real frames without shadows, then use
+// the existing visibility gate while the real simulation, UI and saving continue.
+// One explicit photo-frame draw below captures the current scene for the screenshot.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    let state: Window['__terra'];
+    let frames = 0;
+    const hidden = Object.getOwnPropertyDescriptor(Document.prototype, 'hidden')!.get!;
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      get: () => frames >= 3 || hidden.call(document),
+    });
+    Object.defineProperty(window, '__terra', {
+      configurable: true,
+      get: () => state,
+      set: (next: Window['__terra']) => {
+        state = next;
+        next.sceneMgr.renderer.shadowMap.enabled = false;
+        const draw = next.sceneMgr.renderFrame.bind(next.sceneMgr);
+        next.sceneMgr.renderFrame = () => {
+          draw();
+          frames++;
+          document.documentElement.dataset.renderedFrames = String(frames);
+        };
+      },
+    });
+  });
+});
+
 test('relative assets load; journal pages have accessible controls', async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
   await page.goto('./');
   await expect(page.locator('#loading')).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => Number(document.documentElement.dataset.renderedFrames))).toBeGreaterThan(0);
   await expect(page.getByRole('region', { name: 'Interactive terrarium' })).toBeVisible();
   const toggle = page.getByRole('button', { name: "Open keeper's journal" });
   if (await toggle.isVisible()) await toggle.click();
@@ -23,8 +53,10 @@ test('relative assets load; journal pages have accessible controls', async ({ pa
   const screenshot = process.env.TERRASIM_SCREENSHOTS
     ? `docs/assets/${testInfo.project.name === 'desktop' ? 'terrarium' : 'terrarium-mobile'}.png`
     : testInfo.outputPath('terrarium.png');
+  await page.evaluate(() => window.__terra.sceneMgr.renderFrame());
   await page.screenshot({ path: screenshot, fullPage: true });
   await testInfo.attach('Terrarium and journal', { path: screenshot, contentType: 'image/png' });
+  expect(await page.evaluate(() => Number(document.documentElement.dataset.renderedFrames))).toBeLessThanOrEqual(4);
   await page.getByRole('button', { name: 'Close journal' }).press('Enter');
   await expect(toggle).toBeFocused();
   expect(await page.locator('#book').evaluate((book) => (book as HTMLElement).inert)).toBe(true);
@@ -37,6 +69,7 @@ test('keyboard terrain editing, camera controls, save and welcome dialog', async
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
   await page.goto('./');
   await expect(page.locator('#loading')).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => Number(document.documentElement.dataset.renderedFrames))).toBeGreaterThan(0);
   const toggle = page.getByRole('button', { name: "Open keeper's journal" });
   if (await toggle.isVisible()) await toggle.press('Enter');
   await page.getByRole('button', { name: 'Sand', exact: true }).press('Enter');
