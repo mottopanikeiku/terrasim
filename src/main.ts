@@ -17,6 +17,19 @@ import { save, load, clearSave } from './core/Storage';
 import { SoundScape } from './core/SoundScape';
 import { Journal, formatDuration } from './core/Journal';
 
+declare global {
+  interface Window {
+    __terra: {
+      world: World;
+      sceneMgr: SceneManager;
+      critters: Critters;
+      plantRenderer: PlantRenderer;
+      ground: Ground;
+      water: Water;
+    };
+  }
+}
+
 const SIM_HZ = 30;
 
 // Turn an away-time summary into friendly welcome-back lines.
@@ -86,9 +99,10 @@ function init(): void {
   const input = new Input(sceneMgr.renderer.domElement, sceneMgr.camera, world, sceneMgr.scene);
 
   // Debug handle for development tooling.
-  (window as any).__terra = { world, sceneMgr, critters, plantRenderer, ground, water };
+  window.__terra = { world, sceneMgr, critters, plantRenderer, ground, water };
 
   const ui = new UI();
+  input.setTool('water');
   let speed = 1;
   ui.onTool = (tool) => input.setTool(tool);
   ui.onPreset = (preset) => sceneMgr.setPreset(preset);
@@ -126,7 +140,7 @@ function init(): void {
     dirty = true;
   };
 
-  // Main loop: fixed-rate simulation (scaled by time speed), render every frame.
+  // Fixed-rate gameplay remains independent of the bounded render cadence.
   let last = performance.now();
   let simAccum = 0;
   let saveAccum = 0;
@@ -135,6 +149,7 @@ function init(): void {
 
   function frame(now: number): void {
     requestAnimationFrame(frame);
+    const frameMs = now - last;
     const rawDt = Math.min((now - last) / 1000, 0.1);
     last = now;
     const dt = rawDt * speed;
@@ -183,8 +198,10 @@ function init(): void {
     if (pourKind) audio.pourTick(pourKind);
     audio.update(rawDt, sceneMgr.currentPreset);
     sceneMgr.update(rawDt);
+    sceneMgr.renderIfDue(now, frameMs);
 
-    statsAccum += rawDt;
+    // Interface refresh and persistence use elapsed wall time, not clipped gameplay time.
+    statsAccum += frameMs / 1000;
     if (statsAccum > 1) {
       const st = world.stats();
       ui.updateStats(st, journal.day());
@@ -192,7 +209,7 @@ function init(): void {
       statsAccum = 0;
     }
 
-    saveAccum += rawDt;
+    saveAccum += frameMs / 1000;
     if (dirty && saveAccum > 8) {
       save(world, journal);
       dirty = false;

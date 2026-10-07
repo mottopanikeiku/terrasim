@@ -93,7 +93,7 @@ export class PlantRenderer {
       metalness: 0,
       side: THREE.DoubleSide,
       envMapIntensity: 0.4,
-      emissive: glows ? GLOW_COLOR : undefined,
+      emissive: glows ? GLOW_COLOR : 0x000000,
       emissiveIntensity: 0,
     });
     const mesh = new THREE.Mesh(geo, mat);

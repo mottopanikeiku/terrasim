@@ -6,6 +6,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { TANK_W, TANK_H } from './constants';
+import { RenderPolicy } from './RenderPolicy';
 
 export type PresetName = 'day' | 'golden' | 'night';
 
@@ -184,16 +185,17 @@ export class SceneManager {
   private tiltV: ShaderPass;
   private gradePass: ShaderPass;
   private time = 0;
+  private readonly renderPolicy = new RenderPolicy(matchMedia('(pointer: coarse)').matches || innerWidth < 760);
 
   constructor(container: HTMLElement) {
     this.camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 300);
     this.camera.position.set(13, 8, 17);
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'default' });
     this.renderer.setSize(innerWidth, innerHeight);
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    this.renderer.setPixelRatio(this.renderPolicy.pixelRatio(devicePixelRatio, innerWidth, innerHeight));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.15;
     container.appendChild(this.renderer.domElement);
@@ -280,7 +282,7 @@ export class SceneManager {
     // Lights
     this.sun = new THREE.DirectionalLight(0xffffff, 3);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
+    this.sun.shadow.mapSize.set(this.renderPolicy.shadowSize, this.renderPolicy.shadowSize);
     this.sun.shadow.camera.near = 2;
     this.sun.shadow.camera.far = 60;
     this.sun.shadow.camera.left = -18;
@@ -310,7 +312,7 @@ export class SceneManager {
 
     // Post stack: render -> bloom -> tilt-shift (H+V) -> grade.
     this.composer = new EffectComposer(this.renderer);
-    this.composer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    this.composer.setPixelRatio(this.renderer.getPixelRatio());
     this.composer.setSize(innerWidth, innerHeight);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.3, 0.55, 0.88);
@@ -346,6 +348,33 @@ export class SceneManager {
 
     this.frameTank();
     this.controls.update();
+    const orbitOffset = new THREE.Vector3();
+    const orbitPosition = new THREE.Spherical();
+    this.renderer.domElement.addEventListener('keydown', (e) => {
+      const arrow = e.shiftKey && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key);
+      if (!arrow && !['+', '=', '-', '_', 'Home'].includes(e.key)) return;
+      e.preventDefault();
+      if (e.key === 'Home') {
+        this.frameTank();
+      } else {
+        orbitOffset.copy(this.camera.position).sub(this.controls.target);
+        orbitPosition.setFromVector3(orbitOffset);
+        if (arrow) {
+          if (e.key === 'ArrowLeft') orbitPosition.theta -= 0.1;
+          if (e.key === 'ArrowRight') orbitPosition.theta += 0.1;
+          if (e.key === 'ArrowUp') orbitPosition.phi -= 0.1;
+          if (e.key === 'ArrowDown') orbitPosition.phi += 0.1;
+          orbitPosition.phi = THREE.MathUtils.clamp(orbitPosition.phi, this.controls.minPolarAngle, this.controls.maxPolarAngle);
+        } else {
+          orbitPosition.radius = THREE.MathUtils.clamp(
+            orbitPosition.radius * (e.key === '+' || e.key === '=' ? 0.9 : 1.1),
+            this.controls.minDistance, this.controls.maxDistance
+          );
+        }
+        this.camera.position.copy(this.controls.target).add(orbitOffset.setFromSpherical(orbitPosition));
+      }
+      this.controls.update();
+    });
 
     addEventListener('resize', () => this.onResize());
   }
@@ -458,6 +487,27 @@ export class SceneManager {
     this.composer.render();
   }
 
+  renderIfDue(now: number, frameMs: number): void {
+    if (!this.renderPolicy.shouldRender(now, !document.hidden)) return;
+    const start = performance.now();
+    this.renderFrame();
+    if (this.renderPolicy.observe(frameMs, performance.now() - start)) this.applyQuality();
+  }
+
+  private applyQuality(): void {
+    const ratio = this.renderPolicy.pixelRatio(devicePixelRatio, innerWidth, innerHeight);
+    this.renderer.setPixelRatio(ratio);
+    this.composer.setPixelRatio(ratio);
+    const size = this.renderPolicy.shadowSize;
+    if (this.sun.shadow.mapSize.x !== size) {
+      this.sun.shadow.map?.dispose();
+      this.sun.shadow.map = null;
+      this.sun.shadow.mapSize.set(size, size);
+      this.sun.shadow.needsUpdate = true;
+    }
+    this.updateTiltDeltas();
+  }
+
   update(dt: number): void {
     this.time += dt;
     (this.gradePass.uniforms as any).uTime.value = this.time % 97;
@@ -500,7 +550,6 @@ export class SceneManager {
     this.apply(c);
 
     this.controls.update();
-    this.renderFrame();
   }
 
   // Fit the whole tank in view for any aspect ratio.
@@ -519,6 +568,7 @@ export class SceneManager {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(innerWidth, innerHeight);
     this.composer.setSize(innerWidth, innerHeight);
+    this.applyQuality();
     this.updateTiltDeltas();
     this.frameTank();
   }
