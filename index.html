@@ -2,8 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-    <meta name="description" content="A realistic terrarium sandbox — pour soil, water and sand into a glass aquarium, plant real species, and watch a tiny world live." />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="A terrarium game: pour soil and water, plant species, and tend a small browser garden." />
     <meta property="og:title" content="Terrarium" />
     <meta property="og:description" content="Pour, plant, grow — a living terrarium in your browser." />
     <title>Terrarium</title>
@@ -17,9 +17,9 @@
         --paper-deep: #efe2c4;
         --paper-edge: #d9c69e;
         --ink: #4c3a24;
-        --ink-soft: #80684a;
-        --ink-faint: #a8916e;
-        --accent: #b9683a;
+        --ink-soft: #6b5439;
+        --ink-faint: #715a3e;
+        --accent: #95502b;
         --accent-soft: #e8c9a4;
         --leaf: #5d7d46;
       }
@@ -34,6 +34,10 @@
       }
       #app { width: 100%; height: 100%; position: relative; }
       canvas { display: block; }
+      :focus-visible { outline: 3px solid #245e78; outline-offset: 3px; }
+      canvas:focus-visible { outline-offset: -5px; }
+      .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+      [hidden] { display: none !important; }
 
       #loading {
         position: fixed; inset: 0; z-index: 100;
@@ -43,17 +47,18 @@
       }
       #loading.fade-out { opacity: 0; pointer-events: none; }
       #loading h1 { font-family: 'Fraunces', serif; font-weight: 300; font-size: 2.4rem; color: #d9c9a8; }
-      #loading p { margin-top: 0.8rem; font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: #97876d; }
+      #loading p { margin-top: 0.8rem; font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: #c8b89e; }
 
       #brand {
         position: fixed; top: 18px; left: 22px; z-index: 10; pointer-events: none;
       }
       #brand h1 { font-family: 'Fraunces', serif; font-weight: 500; font-size: 1.5rem; color: #f3e8d2; text-shadow: 0 1px 10px rgba(0,0,0,0.45); }
-      #brand span { font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(243, 232, 210, 0.6); }
+      #brand span { font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: #f3e8d2; text-shadow: 0 1px 3px #221c14; }
+      #brand { background: #30271e; padding: 8px 12px; border-radius: 8px; }
 
       /* paper tag pinned top-left */
       #stats {
-        position: fixed; top: 72px; left: 22px; z-index: 10;
+        position: fixed; top: 86px; left: 22px; z-index: 10;
         display: flex; gap: 11px;
         padding: 7px 15px;
         background: var(--paper);
@@ -67,7 +72,7 @@
       #stats span { display: inline-flex; align-items: center; gap: 2px; }
 
       #alerts {
-        position: fixed; top: 122px; left: 22px; z-index: 10;
+        position: fixed; top: 136px; left: 22px; z-index: 10;
         display: flex; flex-direction: column; gap: 6px;
         max-width: 300px;
       }
@@ -149,7 +154,7 @@
         box-shadow: -3px 3px 8px rgba(10, 6, 2, 0.18);
       }
       .btab .em { font-size: 1.05rem; line-height: 1.2; }
-      .btab label { font-size: 0.5rem; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; }
+      .btab .tab-label { font-size: 0.65rem; letter-spacing: 0.04em; text-transform: uppercase; }
       .btab:hover { transform: translateX(-3px); }
       .btab.active {
         background: var(--paper);
@@ -231,7 +236,7 @@
         border: 2px solid rgba(96, 70, 38, 0.4);
         box-shadow: inset 0 -3px 5px rgba(0,0,0,0.25);
       }
-      .tool label { font-size: 0.6rem; color: var(--ink-soft); pointer-events: none; }
+      .tool .tool-label { font-size: 0.7rem; color: var(--ink-soft); pointer-events: none; }
 
       /* studio rows (settings page) */
       .srow {
@@ -301,6 +306,8 @@
       /* rare modal (welcome back) — a loose page of the same paper */
       .overlay {
         position: fixed; inset: 0; z-index: 50;
+        width: 100%; height: 100%; max-width: none; max-height: none;
+        border: 0; color: var(--ink);
         display: none;
         align-items: center; justify-content: center;
         background: rgba(14, 10, 5, 0.55);
@@ -356,15 +363,24 @@
         #brand span { display: none; }
         #stats { font-size: 0.72rem; gap: 8px; }
       }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation: none !important; transition: none !important; }
+      }
+      @media (max-width: 760px) {
+        #hint { max-width: 90vw; white-space: normal; text-align: center; border-radius: 12px; }
+        #toast { max-width: 90vw; white-space: normal; }
+        #stats { left: 10px; max-width: calc(100vw - 20px); flex-wrap: wrap; }
+      }
     </style>
   </head>
   <body>
-    <div id="app">
+    <main id="app" aria-label="Terrarium garden">
+      <p id="canvas-help" class="sr-only">Choose a tool in the journal. Arrow keys move the terrain target. Enter applies once. Hold Space to pour or dig. Escape stops pouring. Shift and arrows orbit; plus and minus zoom; Home fits the tank.</p>
       <div id="loading">
         <h1>Terrarium</h1>
         <p>Preparing the glass&hellip;</p>
       </div>
-    </div>
+    </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
