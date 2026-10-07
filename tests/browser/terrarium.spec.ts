@@ -2,9 +2,10 @@ import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import type {} from '../../src/main';
 
-test('relative assets load; journal pages have accessible controls', async ({ page }) => {
+test('relative assets load; journal pages have accessible controls', async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
   await page.goto('./');
   await expect(page.locator('#loading')).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Interactive terrarium' })).toBeVisible();
@@ -19,6 +20,11 @@ test('relative assets load; journal pages have accessible controls', async ({ pa
   await expect(page.getByRole('button', { name: 'Automatic lighting' })).toHaveAttribute('aria-pressed', 'false');
   await page.getByRole('button', { name: 'Daylight' }).click();
   await expect(page.getByRole('button', { name: 'Daylight' })).toHaveAttribute('aria-pressed', 'true');
+  const screenshot = process.env.TERRASIM_SCREENSHOTS
+    ? `docs/assets/${testInfo.project.name === 'desktop' ? 'terrarium' : 'terrarium-mobile'}.png`
+    : testInfo.outputPath('terrarium.png');
+  await page.screenshot({ path: screenshot, fullPage: true });
+  await testInfo.attach('Terrarium and journal', { path: screenshot, contentType: 'image/png' });
   await page.getByRole('button', { name: 'Close journal' }).press('Enter');
   await expect(toggle).toBeFocused();
   expect(await page.locator('#book').evaluate((book) => (book as HTMLElement).inert)).toBe(true);
@@ -26,6 +32,9 @@ test('relative assets load; journal pages have accessible controls', async ({ pa
 });
 
 test('keyboard terrain editing, camera controls, save and welcome dialog', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
   await page.goto('./');
   await expect(page.locator('#loading')).toHaveCount(0);
   const toggle = page.getByRole('button', { name: "Open keeper's journal" });
@@ -58,4 +67,5 @@ test('keyboard terrain editing, camera controls, save and welcome dialog', async
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
+  expect(errors).toEqual([]);
 });
