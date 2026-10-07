@@ -16,6 +16,9 @@ const POUR: Record<string, { mat: Mat | 'water'; rate: number }> = {
   gravel: { mat: Mat.GRAVEL, rate: 0.035 },
   water: { mat: 'water', rate: 0.065 },
 };
+const KEYBOARD_MOVES: Record<string, [number, number]> = {
+  ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
+};
 
 export interface PickResult {
   column?: [number, number];
@@ -35,6 +38,7 @@ export class Input {
   private downAt = 0;
   private downPos = new THREE.Vector2();
   private lastPick: PickResult = {};
+  private keyboardColumn: [number, number] | null = null;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -51,6 +55,38 @@ export class Input {
     this.cursor.renderOrder = 50;
     scene.add(this.cursor);
 
+    canvas.tabIndex = 0;
+    canvas.setAttribute('role', 'region');
+    canvas.setAttribute('aria-label', 'Interactive terrarium');
+    canvas.setAttribute('aria-describedby', 'canvas-help');
+    canvas.addEventListener('keydown', (e) => {
+      if (e.shiftKey) return; // Shift + arrows orbit the camera.
+      if (!(e.key in KEYBOARD_MOVES) && e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Escape') return;
+      e.preventDefault();
+      this.keyboardColumn ??= [Math.floor(W / 2), Math.floor(D / 2)];
+      this.hasPointer = true;
+      if (e.key in KEYBOARD_MOVES) {
+        const [dx, dz] = KEYBOARD_MOVES[e.key];
+        this.keyboardColumn[0] = Math.max(0, Math.min(W - 1, this.keyboardColumn[0] + dx));
+        this.keyboardColumn[1] = Math.max(0, Math.min(D - 1, this.keyboardColumn[1] + dz));
+        this.onHint?.(`Column ${this.keyboardColumn[0] + 1}, row ${this.keyboardColumn[1] + 1}`);
+      } else if (e.key === 'Escape') {
+        this.pouring = false;
+      } else if (!e.repeat) {
+        this.beginAction(e.key === 'Enter');
+      }
+      this.updateCursor();
+    });
+    canvas.addEventListener('keyup', (e) => {
+      if (e.key === ' ') { e.preventDefault(); this.pouring = false; }
+    });
+    canvas.addEventListener('blur', () => { this.pouring = false; });
+    canvas.addEventListener('pointercancel', () => { this.pouring = false; });
+    addEventListener('blur', () => { this.pouring = false; });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.pouring = false;
+    });
+
     canvas.addEventListener('pointermove', (e) => {
       this.updatePointer(e);
       this.hasPointer = e.pointerType === 'mouse';
@@ -58,6 +94,7 @@ export class Input {
     });
     canvas.addEventListener('pointerdown', (e) => {
       this.updatePointer(e);
+      canvas.focus({ preventScroll: true });
       this.downAt = performance.now();
       this.downPos.set(e.clientX, e.clientY);
       if (e.button !== 0) return;
@@ -78,6 +115,7 @@ export class Input {
   }
 
   private updatePointer(e: PointerEvent): void {
+    this.keyboardColumn = null;
     this.pointer.x = (e.clientX / innerWidth) * 2 - 1;
     this.pointer.y = -(e.clientY / innerHeight) * 2 + 1;
   }
@@ -239,6 +277,19 @@ export class Input {
 
   // Raymarch the surface heightfield (terrain + water) inside the tank.
   private pick(): PickResult {
+    if (this.keyboardColumn) {
+      const [x, z] = this.keyboardColumn;
+      const i = this.world.idx(x, z);
+      this.lastPick = {
+        column: this.keyboardColumn,
+        point: new THREE.Vector3(
+          (x - W / 2 + 0.5) * V,
+          this.world.groundH[i] + this.world.water[i],
+          (z - D / 2 + 0.5) * V
+        ),
+      };
+      return this.lastPick;
+    }
     this.raycaster.setFromCamera(this.pointer, this.camera);
     const ro = this.raycaster.ray.origin;
     const rd = this.raycaster.ray.direction;
