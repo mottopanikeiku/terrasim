@@ -200,7 +200,8 @@ function init(): void {
     sceneMgr.update(rawDt);
     sceneMgr.renderIfDue(now, frameMs);
 
-    statsAccum += rawDt;
+    // Interface refresh and persistence use elapsed wall time, not clipped gameplay time.
+    statsAccum += frameMs / 1000;
     if (statsAccum > 1) {
       const st = world.stats();
       ui.updateStats(st, journal.day());
@@ -208,7 +209,7 @@ function init(): void {
       statsAccum = 0;
     }
 
-    saveAccum += rawDt;
+    saveAccum += frameMs / 1000;
     if (dirty && saveAccum > 8) {
       save(world, journal);
       dirty = false;

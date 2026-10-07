@@ -109,7 +109,7 @@ export class UI {
       <button id="book-toggle" aria-label="Open keeper's journal" aria-controls="book" aria-expanded="false">\u{1F4D6}</button>
       <section id="book" aria-label="Keeper's journal">
         <nav id="book-tabs" aria-label="Journal pages"></nav>
-        <div id="book-pages"></div>
+        <div id="book-pages" tabindex="0" role="region" aria-label="Journal page contents"></div>
       </section>
     `;
     document.body.appendChild(root);
@@ -516,9 +516,8 @@ export class UI {
   }
 
   updateAlerts(alerts: string[]): void {
-    this.alertsEl.innerHTML = alerts
-      .map((a) => `<div class="alert">${a}</div>`)
-      .join('');
+    const html = alerts.map((a) => `<div class="alert">${a}</div>`).join('');
+    if (this.alertsEl.innerHTML !== html) this.alertsEl.innerHTML = html;
   }
 
   // Populate and open the diary page.

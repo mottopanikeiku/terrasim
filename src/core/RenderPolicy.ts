@@ -36,7 +36,10 @@ export class RenderPolicy {
   // render submission duration catches expensive synchronous drawing work.
   observe(frameMs: number, renderMs: number): boolean {
     const cost = Math.max(frameMs, renderMs);
-    if (!Number.isFinite(cost) || cost <= 0 || cost > 250) return false;
+    if (!Number.isFinite(cost) || cost <= 0) return false;
+    // A long delivery gap with cheap drawing can be a tab returning to the foreground.
+    // Expensive drawing still counts, even when a frame takes hundreds of milliseconds.
+    if (frameMs > 1000 && renderMs < 1000 / this.maxFps * 1.2) return false;
     const slow = cost > 1000 / this.maxFps * 1.2;
     this.slowFrames = slow ? this.slowFrames + 1 : Math.max(0, this.slowFrames - 1);
     this.steadyFrames = cost < 18 ? this.steadyFrames + 1 : 0;

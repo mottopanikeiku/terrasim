@@ -67,3 +67,12 @@ test('isolated stalls and tab-return gaps do not change quality', () => {
   }
   assert.equal(policy.maxFps, 45);
 });
+
+test('very expensive drawing still lowers quality instead of being treated as a tab-return gap', () => {
+  const policy = new RenderPolicy(false);
+  for (let n = 0; n < 30; n++) policy.observe(500, 400);
+  assert.equal(policy.maxFps, 30);
+  for (let n = 0; n < 30; n++) policy.observe(1500, 400);
+  assert.equal(policy.maxFps, 24);
+  assert.equal(policy.shadowSize, 512);
+});
