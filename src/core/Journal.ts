@@ -21,15 +21,22 @@ export class Journal {
     }
   }
 
-  // Calendar age: Day 1 on the day it was born.
   day(at = Date.now()): number {
-    return Math.floor((at - this.bornAt) / 86400000) + 1;
+    return calendarDay(this.bornAt, at);
   }
 
   reset(): void {
     this.bornAt = Date.now();
     this.entries = [];
   }
+}
+
+// Calendar age: Day 1 on the local date the tank was born, Day 2 from the
+// next midnight. Rounding absorbs daylight-saving days of 23 or 25 hours.
+export function calendarDay(bornAt: number, at: number): number {
+  const born = new Date(bornAt).setHours(0, 0, 0, 0);
+  const now = new Date(at).setHours(0, 0, 0, 0);
+  return Math.round((now - born) / 86400000) + 1;
 }
 
 export function formatDuration(seconds: number): string {

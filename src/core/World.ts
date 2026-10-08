@@ -77,11 +77,12 @@ export class World {
   litter: LitterPatch[] = [];
   litterDirty = true;
   private litterMask = new Uint8Array(N);
+  // The "First bloom!" diary milestone fires once per terrarium, so it is saved.
+  firstBloomSeen = false;
 
   private plants: Plant[] = [];
   private nextPlantId = 1;
   private growthTimer = 0;
-  private firstBloomSeen = false;
   private sweep = 0;
 
   // ---- column helpers ----
@@ -104,10 +105,6 @@ export class World {
   topMat(i: number): Mat {
     const n = this.stratN[i];
     return n > 0 ? (this.stratMat[i * MAXS + n - 1] as Mat) : Mat.NONE;
-  }
-
-  surfaceH(i: number): number {
-    return this.groundH[i] + this.water[i];
   }
 
   addLayer(i: number, mat: Mat, h: number): void {
@@ -292,28 +289,26 @@ export class World {
   // Granular relaxation: steep steps shed their top material downhill.
   private talus(): void {
     const fwd = this.sweep === 0;
-    for (let pass = 0; pass < 1; pass++) {
-      for (let z = 0; z < D; z++) {
-        for (let xi = 0; xi < W; xi++) {
-          const x = fwd ? xi : W - 1 - xi;
-          const i = this.idx(x, z);
-          if (this.stratN[i] === 0) continue;
-          const mat = this.topMat(i);
-          let slack = SLACK[mat];
-          if (mat === Mat.SOIL || mat === Mat.SAND) slack *= 1 + this.wet[i] * 0.8;
-          const g = this.groundH[i];
-          // Check the 4 neighbors in alternating order.
-          for (let k = 0; k < 4; k++) {
-            const dir = (k + this.sweep) & 3;
-            const nx = x + (dir === 0 ? 1 : dir === 1 ? -1 : 0);
-            const nz = z + (dir === 2 ? 1 : dir === 3 ? -1 : 0);
-            if (!this.inBounds(nx, nz)) continue;
-            const j = this.idx(nx, nz);
-            const diff = g - this.groundH[j] - this.water[j] * 0.6;
-            if (diff > slack) {
-              this.slide(i, j, Math.min((diff - slack) * 0.22, 0.12));
-              break;
-            }
+    for (let z = 0; z < D; z++) {
+      for (let xi = 0; xi < W; xi++) {
+        const x = fwd ? xi : W - 1 - xi;
+        const i = this.idx(x, z);
+        if (this.stratN[i] === 0) continue;
+        const mat = this.topMat(i);
+        let slack = SLACK[mat];
+        if (mat === Mat.SOIL || mat === Mat.SAND) slack *= 1 + this.wet[i] * 0.8;
+        const g = this.groundH[i];
+        // Check the 4 neighbors in alternating order.
+        for (let k = 0; k < 4; k++) {
+          const dir = (k + this.sweep) & 3;
+          const nx = x + (dir === 0 ? 1 : dir === 1 ? -1 : 0);
+          const nz = z + (dir === 2 ? 1 : dir === 3 ? -1 : 0);
+          if (!this.inBounds(nx, nz)) continue;
+          const j = this.idx(nx, nz);
+          const diff = g - this.groundH[j] - this.water[j] * 0.6;
+          if (diff > slack) {
+            this.slide(i, j, Math.min((diff - slack) * 0.22, 0.12));
+            break;
           }
         }
       }
@@ -618,8 +613,8 @@ export class World {
     return sum;
   }
 
-  grazeMossAt(cx: number, cz: number, r: number): boolean {
-    let ate = false;
+  // Eat from the first well-covered column in the square; one bite per call.
+  grazeMossAt(cx: number, cz: number, r: number): void {
     for (let dz = -r; dz <= r; dz++) {
       for (let dx = -r; dx <= r; dx++) {
         const x = cx + dx, z = cz + dz;
@@ -627,13 +622,11 @@ export class World {
         const i = this.idx(x, z);
         if (this.moss[i] > 0.3) {
           this.moss[i] -= 0.25;
-          ate = true;
           this.tintDirty = true;
-          return true;
+          return;
         }
       }
     }
-    return ate;
   }
 
   // ---- critter / placement helpers ----
@@ -833,6 +826,7 @@ export class World {
     this.litterMask.fill(0);
     this.litterDirty = true;
     this.plants = [];
+    this.firstBloomSeen = false;
     this.humidity = 50;
     this.changed = true;
     this.terrainDirty = true;

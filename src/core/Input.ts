@@ -41,7 +41,7 @@ export class Input {
   private keyboardColumn: [number, number] | null = null;
 
   constructor(
-    private canvas: HTMLCanvasElement,
+    canvas: HTMLCanvasElement,
     private camera: THREE.PerspectiveCamera,
     private world: World,
     scene: THREE.Scene

@@ -4,6 +4,8 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
@@ -11,11 +13,7 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "preserve",
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    }
+    "lib": ["ES2020", "DOM", "DOM.Iterable"]
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]
