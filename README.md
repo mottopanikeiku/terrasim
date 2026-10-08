@@ -16,7 +16,7 @@ I use Node.js 22, npm and a WebGL-capable browser. No API key, server account, m
 
 ```sh
 npm ci
-npm run dev -- --host 127.0.0.1 --open false
+npm run dev
 npm run build
 ```
 
