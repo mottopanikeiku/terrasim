@@ -1,6 +1,6 @@
 import { ToolId } from '../core/Input';
 import { PresetName } from '../core/Scene';
-import { JournalEntry } from '../core/Journal';
+import { calendarDay, JournalEntry } from '../core/Journal';
 import { ALL_SPECIES, SPECIES, Species } from '../world/Plants';
 
 // The keeper's journal: all tools and knowledge live in a little paper
@@ -523,7 +523,7 @@ export class UI {
   // Populate and open the diary page.
   showJournal(entries: JournalEntry[], bornAt: number, day: number): void {
     const fmtWhen = (at: number) => {
-      const d = Math.floor((at - bornAt) / 86400000) + 1;
+      const d = calendarDay(bornAt, at);
       const t = new Date(at);
       const hh = `${t.getHours()}`.padStart(2, '0');
       const mm = `${t.getMinutes()}`.padStart(2, '0');
