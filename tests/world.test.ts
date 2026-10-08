@@ -118,3 +118,20 @@ test('away time composts dead plants and caps catch-up at 72 hours', () => {
   // No pond: humidity drains by 5 points per hour of capped time, floored at 20.
   assert.equal(world.humidity, 20);
 });
+
+test('the first bloom is announced once per terrarium, and again after a reset', () => {
+  const blooms = (world: World) => world.events.filter((e) => e.startsWith('First bloom!')).length;
+  const world = flatWorld(Mat.SOIL, 1);
+  world.wet.fill(1);
+  world.addPlant('sinningia', 30, 30, 0.9995);
+  world.addPlant('sinningia', 60, 30, 0.9995);
+  world.growth(0.5);
+  assert.equal(blooms(world), 1);
+  world.clear();
+  world.events.length = 0;
+  for (let i = 0; i < N; i++) world.addLayer(i, Mat.SOIL, 1);
+  world.wet.fill(1);
+  world.addPlant('sinningia', 30, 30, 0.9995);
+  world.growth(0.5);
+  assert.equal(blooms(world), 1);
+});

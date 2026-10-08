@@ -77,11 +77,12 @@ export class World {
   litter: LitterPatch[] = [];
   litterDirty = true;
   private litterMask = new Uint8Array(N);
+  // The "First bloom!" diary milestone fires once per terrarium, so it is saved.
+  firstBloomSeen = false;
 
   private plants: Plant[] = [];
   private nextPlantId = 1;
   private growthTimer = 0;
-  private firstBloomSeen = false;
   private sweep = 0;
 
   // ---- column helpers ----
@@ -833,6 +834,7 @@ export class World {
     this.litterMask.fill(0);
     this.litterDirty = true;
     this.plants = [];
+    this.firstBloomSeen = false;
     this.humidity = 50;
     this.changed = true;
     this.terrainDirty = true;
