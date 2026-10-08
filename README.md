@@ -8,7 +8,7 @@ My [world model](src/core/World.ts) tracks layered terrain, moisture, growth, wi
 
 ![Terrarium garden and keeper's journal](docs/assets/terrarium.png)
 
-[Pages address](https://mottopanikeiku.github.io/terrasim/) — the repository owner must enable GitHub Pages with **GitHub Actions** as its source before deployment is available.
+[Play it on GitHub Pages](https://mottopanikeiku.github.io/terrasim/). The [workflow](.github/workflows/pages.yml) deploys the default branch after the checks below pass.
 
 ## Play
 
