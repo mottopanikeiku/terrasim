@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "tsx --test tests/render-policy.test.ts",
+    "test": "tsx --test tests/*.test.ts",
     "test:browser": "playwright test"
   },
   "dependencies": {
