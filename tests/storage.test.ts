@@ -92,3 +92,24 @@ test('an older save format keeps only the diary; no save or a corrupt save loads
   clearSave();
   assert.equal(store.has(KEY), false);
 });
+
+test('the first-bloom milestone survives a reload', () => {
+  store.clear();
+  const world = new World();
+  world.firstBloomSeen = true;
+  save(world, new Journal());
+  const restored = new World();
+  load(restored);
+  assert.equal(restored.firstBloomSeen, true);
+
+  // Saves written before the flag existed fall back to the diary.
+  const payload = JSON.parse(store.get(KEY)!);
+  delete payload.firstBloom;
+  store.set(KEY, JSON.stringify(payload));
+  load(restored);
+  assert.equal(restored.firstBloomSeen, false);
+  payload.meta.journal = [{ at: 1, msg: 'First bloom! \u{1F338}' }];
+  store.set(KEY, JSON.stringify(payload));
+  load(restored);
+  assert.equal(restored.firstBloomSeen, true);
+});

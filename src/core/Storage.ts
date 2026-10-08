@@ -58,6 +58,7 @@ export function save(world: World, journal: Journal): void {
       plants: world.getPlants(),
       rocks: world.rocks,
       litter: world.litter,
+      firstBloom: world.firstBloomSeen,
       meta: {
         savedAt: Date.now(),
         bornAt: journal.bornAt,
@@ -99,6 +100,8 @@ export function load(world: World): { meta: SaveMeta; restored: boolean } | null
     world.humidity = p.humidity ?? 50;
     world.rocks = p.rocks ?? [];
     world.litter = p.litter ?? [];
+    // Earlier v7 saves predate the flag; their diary still records the milestone.
+    world.firstBloomSeen = p.firstBloom ?? meta.journal.some((e) => e.msg.startsWith('First bloom!'));
     world.rebuildLitterMask();
     const plants = (p.plants ?? []) as Plant[];
     for (const pl of plants) {
