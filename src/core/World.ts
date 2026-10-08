@@ -619,8 +619,8 @@ export class World {
     return sum;
   }
 
-  grazeMossAt(cx: number, cz: number, r: number): boolean {
-    let ate = false;
+  // Eat from the first well-covered column in the square; one bite per call.
+  grazeMossAt(cx: number, cz: number, r: number): void {
     for (let dz = -r; dz <= r; dz++) {
       for (let dx = -r; dx <= r; dx++) {
         const x = cx + dx, z = cz + dz;
@@ -628,13 +628,11 @@ export class World {
         const i = this.idx(x, z);
         if (this.moss[i] > 0.3) {
           this.moss[i] -= 0.25;
-          ate = true;
           this.tintDirty = true;
-          return true;
+          return;
         }
       }
     }
-    return ate;
   }
 
   // ---- critter / placement helpers ----
