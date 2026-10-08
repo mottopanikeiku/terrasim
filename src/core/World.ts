@@ -107,10 +107,6 @@ export class World {
     return n > 0 ? (this.stratMat[i * MAXS + n - 1] as Mat) : Mat.NONE;
   }
 
-  surfaceH(i: number): number {
-    return this.groundH[i] + this.water[i];
-  }
-
   addLayer(i: number, mat: Mat, h: number): void {
     if (h <= 0) return;
     const b = i * MAXS;
@@ -293,28 +289,26 @@ export class World {
   // Granular relaxation: steep steps shed their top material downhill.
   private talus(): void {
     const fwd = this.sweep === 0;
-    for (let pass = 0; pass < 1; pass++) {
-      for (let z = 0; z < D; z++) {
-        for (let xi = 0; xi < W; xi++) {
-          const x = fwd ? xi : W - 1 - xi;
-          const i = this.idx(x, z);
-          if (this.stratN[i] === 0) continue;
-          const mat = this.topMat(i);
-          let slack = SLACK[mat];
-          if (mat === Mat.SOIL || mat === Mat.SAND) slack *= 1 + this.wet[i] * 0.8;
-          const g = this.groundH[i];
-          // Check the 4 neighbors in alternating order.
-          for (let k = 0; k < 4; k++) {
-            const dir = (k + this.sweep) & 3;
-            const nx = x + (dir === 0 ? 1 : dir === 1 ? -1 : 0);
-            const nz = z + (dir === 2 ? 1 : dir === 3 ? -1 : 0);
-            if (!this.inBounds(nx, nz)) continue;
-            const j = this.idx(nx, nz);
-            const diff = g - this.groundH[j] - this.water[j] * 0.6;
-            if (diff > slack) {
-              this.slide(i, j, Math.min((diff - slack) * 0.22, 0.12));
-              break;
-            }
+    for (let z = 0; z < D; z++) {
+      for (let xi = 0; xi < W; xi++) {
+        const x = fwd ? xi : W - 1 - xi;
+        const i = this.idx(x, z);
+        if (this.stratN[i] === 0) continue;
+        const mat = this.topMat(i);
+        let slack = SLACK[mat];
+        if (mat === Mat.SOIL || mat === Mat.SAND) slack *= 1 + this.wet[i] * 0.8;
+        const g = this.groundH[i];
+        // Check the 4 neighbors in alternating order.
+        for (let k = 0; k < 4; k++) {
+          const dir = (k + this.sweep) & 3;
+          const nx = x + (dir === 0 ? 1 : dir === 1 ? -1 : 0);
+          const nz = z + (dir === 2 ? 1 : dir === 3 ? -1 : 0);
+          if (!this.inBounds(nx, nz)) continue;
+          const j = this.idx(nx, nz);
+          const diff = g - this.groundH[j] - this.water[j] * 0.6;
+          if (diff > slack) {
+            this.slide(i, j, Math.min((diff - slack) * 0.22, 0.12));
+            break;
           }
         }
       }
