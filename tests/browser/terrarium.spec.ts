@@ -41,6 +41,9 @@ test('relative assets load; journal pages have accessible controls', async ({ pa
   await expect(page.getByRole('region', { name: 'Interactive terrarium' })).toBeVisible();
   const toggle = page.getByRole('button', { name: "Open keeper's journal" });
   if (await toggle.isVisible()) await toggle.click();
+  // Shortened visible labels ("plant", "fern") keep the full common name for assistive technology.
+  await expect(page.getByRole('button', { name: 'Friendship plant', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: "Bird's-nest fern", exact: true })).toBeVisible();
   for (const name of ['Tools', 'Guide', 'Diary', 'How', 'Studio']) {
     await page.getByRole('navigation', { name: 'Journal pages' }).getByRole('button', { name, exact: true }).click();
     const result = await new AxeBuilder({ page }).analyze();
