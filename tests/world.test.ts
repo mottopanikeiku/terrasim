@@ -3,6 +3,8 @@ import test from 'node:test';
 import { D, V, W } from '../src/core/constants.ts';
 import { mulberry32 } from '../src/core/random.ts';
 import { MAXS, Mat, N, World } from '../src/core/World.ts';
+import { buildDefaultScene } from '../src/world/DefaultScene.ts';
+import { ALL_SPECIES, SPECIES } from '../src/world/Plants.ts';
 
 // The simulation draws from Math.random; a seeded stream keeps these checks repeatable.
 Math.random = mulberry32(20261008);
@@ -134,4 +136,35 @@ test('the first bloom is announced once per terrarium, and again after a reset',
   world.addPlant('sinningia', 30, 30, 0.9995);
   world.growth(0.5);
   assert.equal(blooms(world), 1);
+});
+
+test('the opening garden has mature, varied planting and connected moss beds', () => {
+  const world = new World();
+  buildDefaultScene(world);
+  const plants = world.getPlants();
+  assert.ok(plants.length >= 50 && plants.length <= 60, `${plants.length} starter plants`);
+  assert.deepEqual(new Set(plants.map((plant) => plant.species)), new Set(ALL_SPECIES));
+  assert.ok(plants.every((plant) => plant.stage >= 0.9 && plant.stage <= 1));
+  assert.ok(plants.every((plant) => plant.look === 0 && plant.health === 80));
+  assert.ok(world.moss.filter((coverage) => coverage > 0.5).length > 3000);
+  for (const plant of plants) {
+    const i = world.idx(plant.x, plant.z);
+    assert.ok(world.wet[i] >= 0.16, `${plant.species} has damp roots`);
+    assert.ok(world.water[i] < SPECIES[plant.species].drownDepth);
+  }
+  assert.equal(world.stats().healthyFrac, 1);
+  assert.deepEqual(world.alerts(world.stats()), []);
+});
+
+test('the opening garden stays healthy while a visitor explores the controls', () => {
+  const world = new World();
+  buildDefaultScene(world);
+  const starters = [...world.getPlants()];
+  for (let tick = 1; tick <= 30 * 120; tick++) {
+    world.tick();
+    if (tick % 15 === 0) world.growth(0.5);
+  }
+  assert.ok(starters.every((plant) => plant.look === 0));
+  assert.ok(world.stats().healthyFrac > 0.8);
+  assert.ok(!world.events.some((event) => event.includes('wilting') || event.includes('withered')));
 });

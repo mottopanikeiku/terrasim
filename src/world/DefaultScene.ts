@@ -1,14 +1,14 @@
 import { W, D } from '../core/constants';
 import { Mat, World } from '../core/World';
 import { valueNoise2D } from '../core/random';
+import { SPECIES } from './Plants';
 
-// The opening scene: a finished-looking landscape across the panoramic
-// tank — mossy highland on the left, rolling meadow in the middle, and a
-// sandy shore with a clear pond on the right. Built directly into the
-// heightfield: no settling pre-roll needed.
+// The opening garden: a fern canopy and mossy understory on the left,
+// flowers around the meadow rocks, then a pond and dry succulent shore.
+// Seed the existing growth stages and moisture, without a simulation pre-roll.
 export function buildDefaultScene(world: World): void {
   world.clear();
-  world.humidity = 58;
+  world.humidity = 66;
 
   const pcx = 118, pcz = 32, pr = 17; // pond center / radius (columns)
 
@@ -49,8 +49,9 @@ export function buildDefaultScene(world: World): void {
         }
       }
 
-      // Moisture: gently damp on the left, wet ring near the pond.
-      world.wet[i] = Math.min(1, Math.max(0.12, 0.32 - u * 0.2) + Math.max(0, 1 - pd / (pr + 6)) * 0.7);
+      // Damp planting beds, a drier succulent shore, and a wet pond bank.
+      const bedWet = u < 0.68 ? 0.68 - u * 0.18 : 0.24;
+      world.wet[i] = Math.min(1, bedWet + Math.max(0, 1 - pd / (pr + 10)) * 0.7);
     }
   }
 
@@ -83,7 +84,7 @@ export function buildDefaultScene(world: World): void {
     { x: 78, z: 15, scale: 0.65, seed: 404 }
   );
 
-  // Moss carpets around the highland rocks.
+  // Broad, overlapping moss patches connect the planting beds.
   const mossPatch = (cx: number, cz: number, r: number) => {
     for (let dz = -r; dz <= r; dz++) {
       for (let dx = -r; dx <= r; dx++) {
@@ -93,61 +94,105 @@ export function buildDefaultScene(world: World): void {
         if (d > 1) continue;
         const i = world.idx(x, z);
         if (world.water[i] > 0.02) continue;
-        world.moss[i] = Math.min(1, world.moss[i] + (1 - d) * (0.5 + Math.random() * 0.4));
+        const edge = Math.min(1, (1 - d) * 3);
+        const cover = 0.72 + valueNoise2D(x * 0.3, z * 0.3, 83) * 0.28;
+        world.moss[i] = Math.min(1, world.moss[i] + edge * cover);
       }
     }
   };
-  mossPatch(21, 16, 6);
-  mossPatch(30, 41, 5);
-  mossPatch(14, 28, 5);
+  mossPatch(15, 15, 15);
+  mossPatch(17, 37, 16);
+  mossPatch(30, 48, 13);
+  mossPatch(33, 24, 15);
+  mossPatch(45, 12, 13);
+  mossPatch(48, 40, 16);
+  mossPatch(62, 24, 15);
+  mossPatch(68, 48, 14);
+  mossPatch(79, 14, 13);
+  mossPatch(83, 36, 16);
+  mossPatch(94, 47, 10);
 
-  // Plants by zone, mostly mature so the scene opens alive — a tour of
-  // the whole species registry.
-  const plantAt = (species: Parameters<World['addPlant']>[0], x: number, z: number, stage: number) => {
-    if (!world.isWater(x, z)) world.addPlant(species, x, z, stage);
+  // Mature specimens give the canopy its shape on the first frame.
+  // Keep room below the existing population cap for planting and reseeding.
+  const plantAt = (species: Parameters<World['addPlant']>[0], x: number, z: number, stage = 1) => {
+    if (world.isWater(x, z)) return;
+    world.addPlant(species, x, z, stage);
+    // Give each root zone a reserve within the species' existing care band.
+    const [lo, hi] = SPECIES[species].idealWet;
+    const moisture = (lo + hi) / 2;
+    for (let dz = -4; dz <= 4; dz++) {
+      for (let dx = -4; dx <= 4; dx++) {
+        if (dx * dx + dz * dz > 16 || !world.inBounds(x + dx, z + dz)) continue;
+        const i = world.idx(x + dx, z + dz);
+        if (world.water[i] < 0.02) world.wet[i] = moisture;
+      }
+    }
   };
-  // Mossy highland: a dense fern corner with foliage underplanting —
-  // real terrariums are LUSH, so the opening scene is too.
-  plantAt('asplenium', 13, 13, 0.95);
-  plantAt('asplenium', 8, 22, 0.7);
-  plantAt('nephrolepis', 25, 33, 0.85);
-  plantAt('nephrolepis', 10, 45, 0.75);
-  plantAt('nephrolepis', 19, 8, 0.65);
-  plantAt('fittonia', 18, 40, 0.9);
-  plantAt('fittonia', 14, 33, 0.7);
-  plantAt('fittonia', 28, 42, 0.6);
-  plantAt('pilea', 31, 25, 0.85);
-  plantAt('pilea', 7, 33, 0.7);
-  plantAt('peperomia', 35, 45, 0.8);
-  plantAt('peperomia', 27, 51, 0.65);
-  plantAt('mycena', 24, 19, 1);
-  plantAt('mycena', 16, 24, 0.8);
-  // Meadow: gloxinias, friendship plants and sedge tussocks.
-  plantAt('sinningia', 63, 30, 1);
-  plantAt('sinningia', 52, 45, 0.85);
-  plantAt('sinningia', 58, 38, 0.6);
-  plantAt('pilea', 75, 21, 0.9);
-  plantAt('pilea', 66, 14, 0.7);
-  plantAt('eleocharis', 57, 16, 0.95);
-  plantAt('eleocharis', 47, 26, 0.8);
-  plantAt('fittonia', 86, 38, 0.85);
-  plantAt('nephrolepis', 45, 38, 0.7);
-  plantAt('leucocoprinus', 70, 48, 0.9);
-  plantAt('sinningia', 80, 50, 0.75);
-  // Pond edge: a thick hairgrass fringe + sundews in the bog.
-  plantAt('eleocharis', 100, 27, 1);
-  plantAt('eleocharis', 108, 47, 0.9);
-  plantAt('eleocharis', 131, 27, 0.85);
-  plantAt('eleocharis', 96, 38, 0.85);
-  plantAt('eleocharis', 121, 12, 0.8);
-  plantAt('drosera', 103, 20, 0.9);
-  plantAt('drosera', 99, 45, 0.7);
+  // Fern canopy, with lower foliage and mushrooms around the highland rocks.
+  plantAt('asplenium', 13, 13);
+  plantAt('asplenium', 8, 27, 0.95);
+  plantAt('asplenium', 19, 43);
+  plantAt('nephrolepis', 25, 33);
+  plantAt('nephrolepis', 10, 48, 0.95);
+  plantAt('nephrolepis', 26, 9);
+  plantAt('nephrolepis', 35, 20);
+  plantAt('nephrolepis', 33, 47, 0.95);
+  plantAt('fittonia', 18, 37);
+  plantAt('fittonia', 8, 38, 0.9);
+  plantAt('pilea', 26, 24);
+  plantAt('pilea', 40, 13, 0.95);
+  plantAt('peperomia', 37, 42);
+  plantAt('peperomia', 22, 52);
+  plantAt('mycena', 22, 17);
+  plantAt('mycena', 16, 26);
+  plantAt('leucocoprinus', 39, 32);
+  plantAt('mycena', 29, 40, 0.95);
+
+  // Staggered ferns frame a flowering meadow rather than isolated seedlings.
+  plantAt('asplenium', 46, 16);
+  plantAt('asplenium', 57, 26);
+  plantAt('asplenium', 74, 12);
+  plantAt('asplenium', 84, 30, 0.95);
+  plantAt('nephrolepis', 46, 38);
+  plantAt('nephrolepis', 61, 10, 0.95);
+  plantAt('nephrolepis', 67, 38);
+  plantAt('nephrolepis', 81, 45);
+  plantAt('nephrolepis', 91, 16);
+  plantAt('fittonia', 48, 49);
+  plantAt('pilea', 65, 20);
+  plantAt('fittonia', 86, 38);
+  plantAt('peperomia', 73, 52);
+  plantAt('sinningia', 51, 31);
+  plantAt('sinningia', 58, 44);
+  plantAt('sinningia', 70, 29);
+  plantAt('sinningia', 77, 38);
+  plantAt('sinningia', 87, 51);
+  plantAt('sinningia', 42, 52, 0.95);
+  plantAt('sinningia', 91, 24);
+  plantAt('leucocoprinus', 54, 21);
+  plantAt('mycena', 62, 35);
+  plantAt('leucocoprinus', 73, 45);
+  plantAt('mycena', 80, 23, 0.95);
+
+  // A hairgrass fringe and sundews leave the open water visible.
+  plantAt('eleocharis', 100, 27);
+  plantAt('eleocharis', 108, 47);
+  plantAt('eleocharis', 131, 27, 0.95);
+  plantAt('eleocharis', 96, 38);
+  plantAt('eleocharis', 121, 12);
+  plantAt('eleocharis', 133, 40);
+  plantAt('eleocharis', 113, 13, 0.95);
+  plantAt('drosera', 103, 20);
+  plantAt('drosera', 99, 45);
+  plantAt('drosera', 124, 50);
+
   // Dry sandy shore: the succulent corner.
-  plantAt('echeveria', 134, 52, 1);
-  plantAt('haworthia', 124, 55, 0.9);
-  plantAt('haworthia', 138, 42, 0.75);
-  plantAt('echeveria', 99, 8, 0.85);
-  plantAt('echeveria', 109, 5, 0.7);
+  plantAt('echeveria', 134, 52);
+  plantAt('haworthia', 124, 55);
+  plantAt('haworthia', 138, 42, 0.95);
+  plantAt('echeveria', 99, 8);
+  plantAt('echeveria', 109, 5, 0.95);
+  plantAt('haworthia', 132, 12);
 
   // Leaf litter under the highland canopy.
   world.addLitter(20, 30);

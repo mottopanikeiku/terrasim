@@ -6,7 +6,7 @@ I built a browser terrarium where I can pour soil and water, plant a garden, and
 
 My [world model](src/core/World.ts) tracks layered terrain, moisture, growth, wilting and composting. [Procedural meshes](src/world/PlantMeshes.ts) draw the plants; the [application loop](src/main.ts) connects editing, lighting, sound, a diary, browser-local saving and PNG photos. This is a playable illustration, not a validated ecosystem model.
 
-![Terrarium garden and keeper's journal](docs/assets/terrarium.png)
+![First-visit terrarium garden with the journal tucked away](docs/assets/terrarium.png)
 
 [Play it on GitHub Pages](https://mottopanikeiku.github.io/terrasim/). The [workflow](.github/workflows/pages.yml) deploys the default branch after the checks below pass.
 
@@ -20,7 +20,7 @@ npm run dev
 npm run build
 ```
 
-Open the URL printed by Vite. Choose a tool in the journal. Hold left mouse to pour or dig; click to plant; right-drag to orbit; scroll to zoom. On touch, drag to orbit and tap to act. The Studio has lighting, time speed, sound, photo and reset controls.
+Open the URL printed by Vite, then open the journal bookmark on the right to choose a tool. Hold left mouse to pour or dig; click to plant; right-drag to orbit; scroll to zoom. On touch, drag to orbit and tap to act. The Studio has lighting, time speed, sound, photo and reset controls.
 
 For keyboard use, Tab through the journal and activate a tool with Enter. Focus moves to the tank: arrows move the terrain target, Enter applies once, and holding Space pours or digs. Escape stops pouring. Shift + arrows orbit, +/− zoom, and Home fits the tank. Closing the journal returns focus to its bookmark. The welcome dialog supports Escape and keeps focus inside while open.
 
