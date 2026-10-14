@@ -26,7 +26,7 @@ For keyboard use, Tab through the journal and activate a tool with Enter. Focus 
 
 ## Rendering and checks
 
-I keep the [30 Hz gameplay simulation](src/main.ts) separate from drawing. The [render policy](src/core/RenderPolicy.ts) caps drawing at 45 frames per second on desktop and 30 on compact/touch screens, lowering it to 24 under sustained pressure. Pixel ratio is capped at 1.5 and limited by a pixel budget; shadows adapt between 512 and 1536 pixels. Recovery needs sustained headroom, and hidden tabs do not draw. These are policies, not measured speed claims or a device-support guarantee.
+I keep the [30 Hz gameplay simulation](src/main.ts) separate from drawing. The [render policy](src/core/RenderPolicy.ts) caps drawing at 45 frames per second on desktop and 30 on compact/touch screens, lowering it to 24 under sustained pressure. Pixel ratio is capped at 1.5 and limited by a pixel budget; shadows adapt between 512 and 1536 pixels. Recovery needs sustained headroom, and hidden tabs do not draw. These are policies, not measured speed claims or a device-support guarantee. I expose local world and renderer state as `window.__terra` in the browser console.
 
 [CI](.github/workflows/pages.yml) type-checks the code and tests, runs [unit tests](tests/) for the terrain, water and plant rules, saving, diary days and render policy, builds the app, and checks desktop/mobile keyboard flows, local saving and journal accessibility with [Playwright and axe](tests/browser/terrarium.spec.ts). The unit tests check conservation and lifecycle rules, not realism. Browser checks use small viewports, disabled shadow maps and a short drawing budget; they do not verify sustained rendering or shadow appearance. It deploys only the default branch after those checks. Vite emits relative asset paths for repository subpaths. To run the checks after building:
 
@@ -42,6 +42,6 @@ npm test && npx playwright install chromium && npm run test:browser
 - Saves stay in this browser; there is no account or portable save export.
 - I have not measured mobile performance. The interface requests Google Fonts.
 
-I use [Three.js](https://threejs.org/docs/) for rendering and controls, [Vite](https://vite.dev/guide/) for bundling, and [Web Audio](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API) for synthesized sound. The [original design brief](docs/original-design-brief.md) preserves historical ideas and unmeasured targets.
+I use [Three.js](https://threejs.org/docs/) for rendering and controls, [Vite](https://vite.dev/guide/) for bundling, and [Web Audio](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API) for synthesized sound.
 
 Written with AI coding assistance.

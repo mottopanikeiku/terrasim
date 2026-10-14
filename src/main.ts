@@ -98,7 +98,7 @@ function init(): void {
 
   const input = new Input(sceneMgr.renderer.domElement, sceneMgr.camera, world, sceneMgr.scene);
 
-  // Debug handle for development tooling.
+  // Local inspector, also used by the browser checks.
   window.__terra = { world, sceneMgr, critters, plantRenderer, ground, water };
 
   const ui = new UI();
