@@ -102,6 +102,7 @@ function init(): void {
   window.__terra = { world, sceneMgr, critters, plantRenderer, ground, water };
 
   const ui = new UI();
+  ui.updateStats(world.stats(), journal.day());
   input.setTool('water');
   let speed = 1;
   ui.onTool = (tool) => input.setTool(tool);

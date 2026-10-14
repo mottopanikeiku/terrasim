@@ -17,6 +17,9 @@ interface Visual {
 }
 
 const GLOW_COLOR = new THREE.Color(0x6fffb4);
+// Match the mature silhouettes to the panoramic tank. Rendering only: every
+// plant shares this scale, while saved stages and simulation rules stay intact.
+const PLANT_SCALE = 3;
 
 const TINT_HEALTHY = new THREE.Color(1, 1, 1);
 const TINT_WILT = new THREE.Color(1.0, 0.82, 0.5);
@@ -46,7 +49,7 @@ export class PlantRenderer {
 
       // Smoothly approach the simulated growth stage.
       v.displayStage += (p.stage - v.displayStage) * Math.min(1, dt * 1.5);
-      const s = 0.14 + 0.86 * v.displayStage;
+      const s = PLANT_SCALE * (0.14 + 0.86 * v.displayStage);
       const squash = p.look === 2 ? 0.85 : 1;
       v.mesh.scale.set(s, s * squash, s);
 
@@ -108,7 +111,7 @@ export class PlantRenderer {
       mesh,
       mat,
       phase: Math.random() * Math.PI * 2,
-      displayStage: 0,
+      displayStage: p.stage,
       tint: TINT_HEALTHY.clone(),
       droop: 0,
       dying: false,

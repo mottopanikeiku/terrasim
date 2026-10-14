@@ -39,11 +39,30 @@ test('relative assets load; journal pages have accessible controls', async ({ pa
   await expect(page.locator('#loading')).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => Number(document.documentElement.dataset.renderedFrames))).toBeGreaterThan(0);
   await expect(page.getByRole('region', { name: 'Interactive terrarium' })).toBeVisible();
+  await expect(page.locator('#book')).toHaveClass('closed');
+  expect(await page.locator('#book').evaluate((book) => (book as HTMLElement).inert)).toBe(true);
+  await expect(page.locator('#stats [title="Ecosystem mood"]')).toHaveText('\u{1F331}');
+  const garden = await page.evaluate(() => {
+    const world = window.__terra.world;
+    return { plants: world.getPlants().length, healthy: world.stats().healthyFrac };
+  });
+  expect(garden.plants).toBeGreaterThanOrEqual(50);
+  expect(garden.healthy).toBe(1);
   const toggle = page.getByRole('button', { name: "Open keeper's journal" });
-  if (await toggle.isVisible()) await toggle.click();
-  // Shortened visible labels ("plant", "fern") keep the full common name for assistive technology.
-  await expect(page.getByRole('button', { name: 'Friendship plant', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: "Bird's-nest fern", exact: true })).toBeVisible();
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await toggle.press('Enter');
+  await expect(page.getByRole('navigation', { name: 'Journal pages' }).getByRole('button', { name: 'Tools', exact: true })).toBeFocused();
+  for (const label of [
+    'Sand', 'Soil', 'Gravel', 'Water', 'Boston fern', "Bird's-nest fern",
+    'Nerve plant', 'Friendship plant', 'String of turtles', 'Mexican snowball',
+    'Zebra plant', 'Dwarf hairgrass', 'Micro gloxinia', 'Cape sundew',
+    'Night-light bonnet', 'Flowerpot dapperling', 'Seeds', 'Moss', 'Rock', 'Litter', 'Dig',
+  ]) {
+    const tool = page.getByRole('button', { name: label, exact: true });
+    await expect(tool).toBeVisible();
+    await expect(tool.locator('.tool-label')).toHaveText(label);
+  }
   for (const name of ['Tools', 'Guide', 'Diary', 'How', 'Studio']) {
     await page.getByRole('navigation', { name: 'Journal pages' }).getByRole('button', { name, exact: true }).click();
     const result = await new AxeBuilder({ page }).analyze();
@@ -104,4 +123,47 @@ test('keyboard terrain editing, camera controls, save and welcome dialog', async
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
   expect(errors).toEqual([]);
+});
+
+test('a returning keeper keeps their saved planting instead of the starter garden', async ({ page }) => {
+  await page.goto('./');
+  await expect(page.locator('#loading')).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => Number(document.documentElement.dataset.renderedFrames))).toBe(3);
+  const saved = await page.evaluate(() => {
+    const world = window.__terra.world;
+    world.getPlants().splice(1);
+    const plant = world.getPlants()[0];
+    plant.x = 55;
+    plant.z = 33;
+    plant.stage = 0.43;
+    plant.health = 63;
+    world.wet[world.idx(55, 33)] = 0.37;
+    world.moss[world.idx(55, 33)] = 0.21;
+    world.rocks = [{ x: 61, z: 29, scale: 0.8, seed: 456 }];
+    world.humidity = 52;
+    // The suite's drawing budget makes the document hidden after three frames.
+    document.dispatchEvent(new Event('visibilitychange'));
+    return localStorage.getItem('terrasim-v5')!;
+  });
+  const payload = JSON.parse(saved);
+  await page.addInitScript((value) => localStorage.setItem('terrasim-v5', value), saved);
+  // Inspect the restored state before normal simulation ticks can change it.
+  const now = new Date();
+  await page.clock.install({ time: now });
+  await page.clock.pauseAt(now);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  const restored = await page.evaluate(() => {
+    const world = window.__terra.world;
+    const i = world.idx(55, 33);
+    return {
+      plants: world.getPlants(), rocks: world.rocks, humidity: world.humidity,
+      moisture: world.wet[i], moss: world.moss[i],
+    };
+  });
+  expect(restored.plants).toEqual(payload.plants);
+  expect(restored.rocks).toEqual(payload.rocks);
+  expect(restored.humidity).toBe(52);
+  expect(restored.moisture).toBeCloseTo(0.37);
+  expect(restored.moss).toBeCloseTo(0.21);
+  await expect(page.getByRole('dialog', { name: 'Welcome back' })).toHaveCount(0);
 });

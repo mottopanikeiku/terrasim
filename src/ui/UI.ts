@@ -11,7 +11,6 @@ import { ALL_SPECIES, SPECIES, Species } from '../world/Plants';
 interface ToolDef {
   id: ToolId;
   label: string;
-  name?: string; // accessible name when the visible label is shortened
   icon: string; // emoji, or css color prefixed with '#' for a swatch
   hint: string;
 }
@@ -27,8 +26,7 @@ const PLANT_TOOLS: ToolDef[] = ALL_SPECIES.map((id) => {
   const def = SPECIES[id];
   return {
     id,
-    label: def.label.split(' ')[0].length <= 7 ? def.label.split(' ')[0] : def.label.split(' ').pop()!,
-    name: def.label,
+    label: def.label,
     icon: def.icon,
     hint: `${def.label} · ${def.sci} (${def.family}) — ${def.care}`,
   };
@@ -161,7 +159,7 @@ export class UI {
     this.buildHelpPage();
     this.buildStudioPage();
     this.setPage('tools');
-    this.openBook(innerWidth >= 900);
+    this.openBook(false);
 
     this.selectTool('water');
     this.hint('Choose a tool in the journal; focus the tank and use arrows + Enter to act', 8000);
@@ -211,12 +209,12 @@ export class UI {
       h.textContent = title;
       el.appendChild(h);
       const row = document.createElement('div');
-      row.className = 'row';
+      row.className = tools === PLANT_TOOLS ? 'row plant-tools' : 'row';
       for (const t of tools) {
         const btn = document.createElement('button');
         btn.className = 'tool';
         btn.title = t.hint;
-        btn.setAttribute('aria-label', t.name ?? t.label);
+        btn.setAttribute('aria-label', t.label);
         const iconHtml = t.icon.startsWith('#')
           ? `<span class="swatch" style="background:${t.icon}"></span>`
           : `<span class="emoji">${t.icon}</span>`;
