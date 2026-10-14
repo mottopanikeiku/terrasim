@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { V, cellToWorld } from '../core/constants';
+import { cellToWorld } from '../core/constants';
 import { World } from '../core/World';
 
 // The cozy room around the tank: a plaster wall, framed prints, and little
