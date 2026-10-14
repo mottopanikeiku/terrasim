@@ -8,7 +8,7 @@ My [world model](src/core/World.ts) tracks layered terrain, moisture, growth, wi
 
 ![Terrarium garden and keeper's journal](docs/assets/terrarium.png)
 
-[Pages address](https://mottopanikeiku.github.io/terrasim/) — the repository owner must enable GitHub Pages with **GitHub Actions** as its source before deployment is available.
+[Play it on GitHub Pages](https://mottopanikeiku.github.io/terrasim/). The [workflow](.github/workflows/pages.yml) deploys the default branch after the checks below pass.
 
 ## Play
 
@@ -16,7 +16,7 @@ I use Node.js 22, npm and a WebGL-capable browser. No API key, server account, m
 
 ```sh
 npm ci
-npm run dev -- --host 127.0.0.1 --open false
+npm run dev
 npm run build
 ```
 
@@ -26,9 +26,9 @@ For keyboard use, Tab through the journal and activate a tool with Enter. Focus 
 
 ## Rendering and checks
 
-I keep the existing [30 Hz gameplay simulation](src/main.ts) separate from drawing. The [render policy](src/core/RenderPolicy.ts) caps drawing at 45 frames per second on desktop and 30 on compact/touch screens, lowering it to 24 under sustained pressure. Pixel ratio is capped at 1.5 and limited by a pixel budget; shadows adapt between 512 and 1536 pixels. Recovery needs sustained headroom, and hidden tabs do not draw. These are policies, not measured speed claims or a device-support guarantee.
+I keep the [30 Hz gameplay simulation](src/main.ts) separate from drawing. The [render policy](src/core/RenderPolicy.ts) caps drawing at 45 frames per second on desktop and 30 on compact/touch screens, lowering it to 24 under sustained pressure. Pixel ratio is capped at 1.5 and limited by a pixel budget; shadows adapt between 512 and 1536 pixels. Recovery needs sustained headroom, and hidden tabs do not draw. These are policies, not measured speed claims or a device-support guarantee.
 
-[CI](.github/workflows/pages.yml) builds the app, runs [policy unit tests](tests/render-policy.test.ts), and checks desktop/mobile keyboard flows, local saving and journal accessibility with [Playwright and axe](tests/browser/terrarium.spec.ts). Browser checks use small viewports, disabled shadow maps and a short drawing budget; they do not verify sustained rendering or shadow appearance. It deploys only the default branch after those checks. Vite emits relative asset paths for repository subpaths. To run the checks after building:
+[CI](.github/workflows/pages.yml) type-checks the code and tests, runs [unit tests](tests/) for the terrain, water and plant rules, saving, diary days and render policy, builds the app, and checks desktop/mobile keyboard flows, local saving and journal accessibility with [Playwright and axe](tests/browser/terrarium.spec.ts). The unit tests check conservation and lifecycle rules, not realism. Browser checks use small viewports, disabled shadow maps and a short drawing budget; they do not verify sustained rendering or shadow appearance. It deploys only the default branch after those checks. Vite emits relative asset paths for repository subpaths. To run the checks after building:
 
 ```sh
 npm test && npx playwright install chromium && npm run test:browser

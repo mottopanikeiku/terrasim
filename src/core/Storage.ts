@@ -39,9 +39,9 @@ function quant(arr: Float32Array, scale: number): number[] {
 }
 
 function dequant(data: number[], target: Float32Array, scale: number): void {
-  const tmp = new Array<number>(target.length).fill(0);
-  rleDecode(data, tmp as unknown as { [k: number]: number; length: number });
-  for (let i = 0; i < target.length; i++) target[i] = tmp[i] / scale;
+  target.fill(0);
+  rleDecode(data, target);
+  for (let i = 0; i < target.length; i++) target[i] /= scale;
 }
 
 export function save(world: World, journal: Journal): void {
@@ -58,6 +58,7 @@ export function save(world: World, journal: Journal): void {
       plants: world.getPlants(),
       rocks: world.rocks,
       litter: world.litter,
+      firstBloom: world.firstBloomSeen,
       meta: {
         savedAt: Date.now(),
         bornAt: journal.bornAt,
@@ -85,9 +86,9 @@ export function load(world: World): { meta: SaveMeta; restored: boolean } | null
     };
     if (p.v !== 7) return { meta, restored: false };
 
-    rleDecode(p.stratMat, world.stratMat as unknown as { [k: number]: number; length: number });
+    rleDecode(p.stratMat, world.stratMat);
     dequant(p.stratH, world.stratH, 200);
-    rleDecode(p.stratN, world.stratN as unknown as { [k: number]: number; length: number });
+    rleDecode(p.stratN, world.stratN);
     dequant(p.water, world.water, 200);
     dequant(p.wet, world.wet, 100);
     dequant(p.moss, world.moss, 100);
@@ -99,6 +100,8 @@ export function load(world: World): { meta: SaveMeta; restored: boolean } | null
     world.humidity = p.humidity ?? 50;
     world.rocks = p.rocks ?? [];
     world.litter = p.litter ?? [];
+    // Earlier v7 saves predate the flag; their diary still records the milestone.
+    world.firstBloomSeen = p.firstBloom ?? meta.journal.some((e) => e.msg.startsWith('First bloom!'));
     world.rebuildLitterMask();
     const plants = (p.plants ?? []) as Plant[];
     for (const pl of plants) {
