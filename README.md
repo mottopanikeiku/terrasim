@@ -1,47 +1,51 @@
 # Terrasim
 
-I built a browser terrarium where I can pour soil and water, plant a garden, and return to it later.
+Terrasim is a browser terrarium with editable soil, water and procedural plants. Pour a pond, plant around it, and come back to the same garden later.
 
-**Question:** Can simple water and plant-care rules make a small digital garden feel alive?
+![A planted terrarium with layered soil and a small pond](docs/assets/terrarium.png)
 
-My [world model](src/core/World.ts) tracks layered terrain, moisture, growth, wilting and composting. [Procedural meshes](src/world/PlantMeshes.ts) draw the plants; the [application loop](src/main.ts) connects editing, lighting, sound, a diary, browser-local saving and PNG photos. This is a playable illustration, not a validated ecosystem model.
+[Play Terrasim](https://mottopanikeiku.github.io/terrasim/)
 
-![First-visit terrarium garden with the journal tucked away](docs/assets/terrarium.png)
+## Tending the garden
 
-[Play it on GitHub Pages](https://mottopanikeiku.github.io/terrasim/). The [workflow](.github/workflows/pages.yml) deploys the default branch after the checks below pass.
+Open the journal bookmark on the right to choose a tool. Add sand, soil, gravel or water; plant ferns, succulents and mushrooms; scatter seeds, moss, rocks or leaf litter.
 
-## Play
+Plants grow, wilt when dry, recover when watered, and compost when they die. Water evaporates, raises humidity and condenses on the glass. The diary keeps track of the garden, and saves stay in your browser.
 
-I use Node.js 22, npm and a WebGL-capable browser. No API key, server account, model download or paid compute is needed.
+| Action | Mouse or touch | Keyboard |
+| --- | --- | --- |
+| Choose a tool | Open the journal and select a tool | Tab, then Enter |
+| Pour or dig | Hold left mouse | Hold Space with the tank focused |
+| Plant | Click or tap | Arrows move the target; Enter plants |
+| Orbit | Right-drag; drag on touch | Shift + arrows |
+| Zoom | Scroll | `+` / `−` |
+| Fit the tank | | Home |
+| Stop pouring | Release the mouse | Escape |
+
+The Studio controls lighting, time speed and sound. It also takes PNG photos and resets the garden.
+
+## Run locally
+
+Use Node.js 22 and a WebGL-capable browser.
 
 ```sh
 npm ci
 npm run dev
-npm run build
 ```
 
-Open the URL printed by Vite, then open the journal bookmark on the right to choose a tool. Hold left mouse to pour or dig; click to plant; right-drag to orbit; scroll to zoom. On touch, drag to orbit and tap to act. The Studio has lighting, time speed, sound, photo and reset controls.
-
-For keyboard use, Tab through the journal and activate a tool with Enter. Focus moves to the tank: arrows move the terrain target, Enter applies once, and holding Space pours or digs. Escape stops pouring. Shift + arrows orbit, +/− zoom, and Home fits the tank. Closing the journal returns focus to its bookmark. The welcome dialog supports Escape and keeps focus inside while open.
-
-## Rendering and checks
-
-I keep the [30 Hz gameplay simulation](src/main.ts) separate from drawing. The [render policy](src/core/RenderPolicy.ts) caps drawing at 45 frames per second on desktop and 30 on compact/touch screens, lowering it to 24 under sustained pressure. Pixel ratio is capped at 1.5 and limited by a pixel budget; shadows adapt between 512 and 1536 pixels. Recovery needs sustained headroom, and hidden tabs do not draw. These are policies, not measured speed claims or a device-support guarantee. I expose local world and renderer state as `window.__terra` in the browser console.
-
-[CI](.github/workflows/pages.yml) type-checks the code and tests, runs [unit tests](tests/) for the terrain, water and plant rules, saving, diary days and render policy, builds the app, and checks desktop/mobile keyboard flows, local saving and journal accessibility with [Playwright and axe](tests/browser/terrarium.spec.ts). The unit tests check conservation and lifecycle rules, not realism. Browser checks use small viewports, disabled shadow maps and a short drawing budget; they do not verify sustained rendering or shadow appearance. It deploys only the default branch after those checks. Vite emits relative asset paths for repository subpaths. To run the checks after building:
+Open the URL printed by Vite. To build and run the checks:
 
 ```sh
-npm test && npx playwright install chromium && npm run test:browser
+npm test
+npm run build
+npx playwright install chromium
+npm run test:browser
 ```
 
-## Limits and prior work
+The [world model](src/core/World.ts) handles terrain, moisture and plant lifecycles. [Procedural meshes](src/world/PlantMeshes.ts) draw each plant, while a separate render loop adapts resolution and shadows to the drawing load. Unit tests cover the world rules and saved state; browser tests cover editing, keyboard controls and the journal.
 
-- Care and water transport are hand-tuned game rules, not botanical advice.
-- Terrain is a heightfield; it cannot represent caves or overhangs.
-- Random events and away-time approximation are not a scientific simulation.
-- Saves stay in this browser; there is no account or portable save export.
-- I have not measured mobile performance. The interface requests Google Fonts.
+The terrain is a heightfield, so digging cannot make caves or overhangs. Plant care follows hand-tuned game rules. Saves are local to this browser.
 
-I use [Three.js](https://threejs.org/docs/) for rendering and controls, [Vite](https://vite.dev/guide/) for bundling, and [Web Audio](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API) for synthesized sound.
+## Credits
 
-Written with AI coding assistance.
+Built with [Three.js](https://threejs.org/), [Vite](https://vite.dev/) and synthesized [Web Audio](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API) sound. The interface uses Fraunces and DM Sans from Google Fonts. [MIT license](LICENSE).

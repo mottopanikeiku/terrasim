@@ -101,7 +101,7 @@ export class UI {
     root.id = 'ui';
     root.setAttribute('aria-label', 'Terrarium controls');
     root.innerHTML = `
-      <div id="brand"><h1>Terrarium</h1><span>pour &middot; plant &middot; grow</span></div>
+      <div id="brand"><h1>Terrarium</h1><span>Your browser garden</span></div>
       <div id="stats" role="group" aria-label="Terrarium status"></div>
       <div id="alerts" aria-live="polite"></div>
       <div id="toast" role="status"></div>
@@ -293,17 +293,14 @@ export class UI {
   private buildDiaryPage(): void {
     this.diaryPage = this.page('diary');
     this.diaryPage.innerHTML = `<h2>\u{1F4D4} Diary</h2>
-      <p class="sub">the story starts now \u{1F331}</p>`;
+      <p class="sub">Garden notes</p>`;
   }
 
   private buildHelpPage(): void {
     const el = this.page('help');
     el.innerHTML = `
       <h2>\u{1F331} How it works</h2>
-      <p class="sub">a tiny world behind glass</p>
-      <p>This is a small game inspired by terrariums, not a botanical
-      prediction or plant-care guide. Water, soil and plant health follow
-      hand-tuned rules.</p>
+      <p>Water, soil and plant health follow hand-tuned game rules.</p>
 
       <h3>\u{1FAA8} The layers</h3>
       <p><b>Gravel</b> at the bottom is drainage. <b>Sand</b> keeps the soil
@@ -312,10 +309,9 @@ export class UI {
 
       <h3>\u{1F4A7} The water cycle</h3>
       <p>Open water slowly <b>evaporates</b> and raises the humidity. Humid
-      air <b>condenses</b> on the glass — watch for droplets — and trickles
-      back into the soil at the edges. Plants drink from damp soil (it
-      looks darker). The dark ring around the pond illustrates soil
-      moisture; these are game rules, not measured water transport.</p>
+      air <b>condenses</b> on the glass and trickles
+      back into the soil at the edges. Plants drink from damp soil,
+      which looks darker around the pond.</p>
 
       <h3>\u{1F33F} The plants</h3>
       <p>Each species drinks at its own pace and grows in real time — a
@@ -350,7 +346,7 @@ export class UI {
   private buildStudioPage(): void {
     const el = this.page('studio');
     el.innerHTML = `<h2>\u{2699}\u{FE0F} Studio</h2>
-      <p class="sub">light, pace and keepsakes</p>`;
+      <p class="sub">Lighting and garden settings</p>`;
 
     const row = (label: string): HTMLElement => {
       const r = document.createElement('div');
