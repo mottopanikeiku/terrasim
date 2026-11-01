@@ -149,7 +149,8 @@ test('a returning keeper keeps their saved planting instead of the starter garde
   await page.addInitScript((value) => localStorage.setItem('terrasim-v5', value), saved);
   // Inspect the restored state before normal simulation ticks can change it.
   const now = new Date();
-  await page.clock.install({ time: now });
+  // Leave room for the install call to finish before pausing at the saved time.
+  await page.clock.install({ time: new Date(now.getTime() - 60_000) });
   await page.clock.pauseAt(now);
   await page.reload({ waitUntil: 'domcontentloaded' });
   const restored = await page.evaluate(() => {
