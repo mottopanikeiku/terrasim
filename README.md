@@ -1,51 +1,40 @@
 # Terrasim
 
-Terrasim is a browser terrarium with editable soil, water and procedural plants. Pour a pond, plant around it, and come back to the same garden later.
+A glass tank of soil, water and twelve plant species that runs [in the browser](https://mottopanikeiku.github.io/terrasim/) with Three.js. You pour layers of sand, soil and gravel, dig a pond and plant around it. The plants drink, wilt, recover, die and compost back into the soil. The garden is saved in the browser, and when you come back it fast-forwards through up to three days you were away.
 
-![A planted terrarium with layered soil and a small pond](docs/assets/terrarium.png)
+[![A planted terrarium with layered soil, ferns and a small pond](assets/hero.webp)](https://mottopanikeiku.github.io/terrasim/)
 
-[Play Terrasim](https://mottopanikeiku.github.io/terrasim/)
+<p>
+<img alt="The journal open on the tool list" src="assets/tools.webp" width="49%">
+<img alt="The same garden at night, with glowing fungi" src="assets/night.webp" width="49%">
+</p>
 
-## Tending the garden
+## In the tank
 
-Open the journal bookmark on the right to choose a tool. Add sand, soil, gravel or water; plant ferns, succulents and mushrooms; scatter seeds, moss, rocks or leaf litter.
-
-Plants grow, wilt when dry, recover when watered, and compost when they die. Water evaporates, raises humidity and condenses on the glass. The diary keeps track of the garden, and saves stay in your browser.
+- Sand, soil, gravel and water pour in layers, and the dig tool takes them back out.
+- Twelve species, from Boston fern and string of turtles to a glowing mushroom.
+- Seeds, moss, rocks and leaf litter.
+- Water evaporates and fogs the glass.
+- Pillbugs, snails, springtails and butterflies move in uninvited.
+- Night mode brings out fireflies. You can also speed up time or save a photo of the tank.
 
 | Action | Mouse or touch | Keyboard |
 | --- | --- | --- |
-| Choose a tool | Open the journal and select a tool | Tab, then Enter |
-| Pour or dig | Hold left mouse | Hold Space with the tank focused |
-| Plant | Click or tap | Arrows move the target; Enter plants |
-| Orbit | Right-drag; drag on touch | Shift + arrows |
-| Zoom | Scroll | `+` / `−` |
-| Fit the tank | | Home |
-| Stop pouring | Release the mouse | Escape |
+| Pick a tool | Open the journal on the right | Tab, then Enter |
+| Pour or dig | Hold left mouse; tap on touch | Hold Space on the tank |
+| Plant | Click or tap | Arrows aim, Enter plants |
+| Orbit / zoom | Right-drag, scroll | Shift + arrows, `+` / `−` |
+| Fit the tank / stop pouring | | Home / Escape |
 
-The Studio controls lighting, time speed and sound. It also takes PNG photos and resets the garden.
+## How it works
 
-## Run locally
-
-Use Node.js 22 and a WebGL-capable browser.
+The terrain is a heightfield, so there are no caves or overhangs. [`World.ts`](src/core/World.ts) holds soil, moisture and plant lifecycles, with care rules I tuned by hand. Each plant is a [procedural mesh](src/world/PlantMeshes.ts), and the sound is synthesized in Web Audio.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open the URL printed by Vite. To build and run the checks:
+Needs Node 22 and a browser with WebGL. `npm test` runs the unit tests and `npm run test:browser` the Playwright checks.
 
-```sh
-npm test
-npm run build
-npx playwright install chromium
-npm run test:browser
-```
-
-The [world model](src/core/World.ts) handles terrain, moisture and plant lifecycles. [Procedural meshes](src/world/PlantMeshes.ts) draw each plant, while a separate render loop adapts resolution and shadows to the drawing load. Unit tests cover the world rules and saved state; browser tests cover editing, keyboard controls and the journal.
-
-The terrain is a heightfield, so digging cannot make caves or overhangs. Plant care follows hand-tuned game rules. Saves are local to this browser.
-
-## Credits
-
-Built with [Three.js](https://threejs.org/), [Vite](https://vite.dev/) and synthesized [Web Audio](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API) sound. The interface uses Fraunces and DM Sans from Google Fonts. [MIT license](LICENSE).
+Built with [Three.js](https://threejs.org/) and [Vite](https://vite.dev/). The interface uses Fraunces and DM Sans from Google Fonts. [MIT license](LICENSE).

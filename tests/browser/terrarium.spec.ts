@@ -72,9 +72,7 @@ test('relative assets load; journal pages have accessible controls', async ({ pa
   await expect(page.getByRole('button', { name: 'Automatic lighting' })).toHaveAttribute('aria-pressed', 'false');
   await page.getByRole('button', { name: 'Daylight' }).click();
   await expect(page.getByRole('button', { name: 'Daylight' })).toHaveAttribute('aria-pressed', 'true');
-  const screenshot = process.env.TERRASIM_SCREENSHOTS
-    ? `docs/assets/${testInfo.project.name === 'desktop' ? 'terrarium' : 'terrarium-mobile'}.png`
-    : testInfo.outputPath('terrarium.png');
+  const screenshot = testInfo.outputPath('terrarium.png');
   await page.evaluate(() => window.__terra.sceneMgr.renderFrame());
   await page.screenshot({ path: screenshot, fullPage: true });
   await testInfo.attach('Terrarium and journal', { path: screenshot, contentType: 'image/png' });
