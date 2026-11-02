@@ -479,7 +479,7 @@ export class World {
       }
       if (plant.look === 0 && plant.health < 42) {
         plant.look = 1;
-        this.events.push(`The ${def.label.toLowerCase()} is wilting — it needs water \u{1F4A7}`);
+        this.events.push(`The ${def.label.toLowerCase()} is wilting and needs water \u{1F4A7}`);
       } else if (plant.look === 1 && plant.health > 60) {
         plant.look = 0;
         this.events.push(`The ${def.label.toLowerCase()} perked back up \u{1F33F}`);
@@ -702,11 +702,11 @@ export class World {
 
   alerts(s: { humidity: number; water: number; plants: number; healthyFrac: number }): string[] {
     const out: string[] = [];
-    if (s.plants === 0) out.push('\u{1F331} Nothing is growing — scatter some seeds');
-    if (s.water === 0) out.push('\u{1F3DC}\u{FE0F} No standing water — the water cycle has stalled');
-    else if (s.humidity < 42) out.push('\u{1F4A8} The air is dry — pour some water');
-    if (s.humidity > 88) out.push('\u{1F4A6} Very humid — the glass is fogging heavily');
-    if (s.plants > 0 && s.healthyFrac < 0.7) out.push('\u{1F940} Plants are thirsty — water the soil near them');
+    if (s.plants === 0) out.push('\u{1F331} Nothing is growing. Scatter some seeds');
+    if (s.water === 0) out.push('\u{1F3DC}\u{FE0F} No standing water. The water cycle has stalled');
+    else if (s.humidity < 42) out.push('\u{1F4A8} The air is dry. Pour some water');
+    if (s.humidity > 88) out.push('\u{1F4A6} Very humid. The glass is fogging');
+    if (s.plants > 0 && s.healthyFrac < 0.7) out.push('\u{1F940} Plants are thirsty. Water the soil near them');
     return out;
   }
 

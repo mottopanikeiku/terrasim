@@ -19,7 +19,7 @@ const POUR_TOOLS: ToolDef[] = [
   { id: 'sand', label: 'Sand', icon: '#d6bc8a', hint: 'Hold left mouse to pour sand' },
   { id: 'soil', label: 'Soil', icon: '#5d4734', hint: 'Hold left mouse to pour soil' },
   { id: 'gravel', label: 'Gravel', icon: '#9a948c', hint: 'Hold left mouse to pour gravel' },
-  { id: 'water', label: 'Water', icon: '#6fb3d9', hint: 'Hold left mouse to pour water — plants drink it from the soil' },
+  { id: 'water', label: 'Water', icon: '#6fb3d9', hint: 'Hold left mouse to pour water. Plants drink it from the soil' },
 ];
 
 const PLANT_TOOLS: ToolDef[] = ALL_SPECIES.map((id) => {
@@ -28,30 +28,30 @@ const PLANT_TOOLS: ToolDef[] = ALL_SPECIES.map((id) => {
     id,
     label: def.label,
     icon: def.icon,
-    hint: `${def.label} · ${def.sci} (${def.family}) — ${def.care}`,
+    hint: `${def.label} · ${def.sci} (${def.family}): ${def.care}`,
   };
 });
 
 const EXTRA_TOOLS: ToolDef[] = [
-  { id: 'seeds', label: 'Seeds', icon: '\u{1F33E}', hint: 'Toss a handful of mixed seeds — they sprout on damp soil' },
+  { id: 'seeds', label: 'Seeds', icon: '\u{1F33E}', hint: 'Toss a handful of mixed seeds. They sprout on damp soil' },
   { id: 'moss', label: 'Moss', icon: '\u{1F7E2}', hint: 'Click rocks or soil to spread a moss colony' },
   { id: 'rock', label: 'Rock', icon: '\u{1FAA8}', hint: 'Click to set a rock on the terrain' },
-  { id: 'litter', label: 'Litter', icon: '\u{1F342}', hint: 'Scatter fallen leaves — mulch that keeps the soil under it damp' },
+  { id: 'litter', label: 'Litter', icon: '\u{1F342}', hint: 'Scatter fallen leaves as mulch to keep the soil under them damp' },
   { id: 'erase', label: 'Dig', icon: '\u{26CF}\u{FE0F}', hint: 'Hold to dig away material and water' },
 ];
 
 const FAUNA_GUIDE: { label: string; sci: string; family: string; icon: string; lore: string }[] = [
   {
     label: 'Common pill-bug', sci: 'Armadillidium vulgare', family: 'Armadillidiidae', icon: '\u{1FAB2}',
-    lore: 'Not an insect — a land crustacean (an isopod) that still breathes through gill-like plates, which is why it needs humid air. Rolls into a perfect ball when alarmed ("conglobation") and earns its keep eating dead plant matter.',
+    lore: 'A land crustacean (an isopod), not an insect. It still breathes through gill-like plates, which is why it needs humid air. Rolls into a ball when alarmed ("conglobation") and eats dead plant matter.',
   },
   {
     label: 'Garden snail', sci: 'Cornu aspersum', family: 'Helicidae', icon: '\u{1F40C}',
-    lore: 'Grazes films and tender moss with a radula — a ribbon tongue bearing thousands of microscopic teeth. Seals its shell with dried mucus to wait out dry spells.',
+    lore: 'Grazes films and tender moss with a radula: a ribbon tongue bearing thousands of microscopic teeth. Seals its shell with dried mucus to wait out dry spells.',
   },
   {
     label: 'Springtail', sci: 'Folsomia candida', family: 'Isotomidae', icon: '\u{26AA}',
-    lore: 'A primitive six-legged soil dweller with a spring-loaded tail (furcula) it snaps to launch itself away from danger. The mold patrol of every bioactive terrarium — watch for tiny pale hops near damp soil.',
+    lore: 'A primitive six-legged soil dweller with a spring-loaded tail (furcula) it snaps to launch itself away from danger. The mold patrol of every bioactive terrarium. Watch for tiny pale hops near damp soil.',
   },
   {
     label: 'Common eastern firefly', sci: 'Photinus pyralis', family: 'Lampyridae', icon: '\u{2728}',
@@ -59,7 +59,7 @@ const FAUNA_GUIDE: { label: string; sci: string; family: string; icon: string; l
   },
   {
     label: 'Butterflies', sci: 'Pieris rapae · Polyommatus icarus', family: 'Pieridae / Lycaenidae', icon: '\u{1F98B}',
-    lore: 'Day-fliers that taste with their feet and drink nectar through a coiled proboscis. At night they do not sleep so much as roost — wings folded, metabolism low, waiting for the sun.',
+    lore: 'Day-fliers that taste with their feet and drink nectar through a coiled proboscis. At night they do not sleep so much as roost: wings folded, metabolism low, waiting for the sun.',
   },
 ];
 
@@ -101,7 +101,7 @@ export class UI {
     root.id = 'ui';
     root.setAttribute('aria-label', 'Terrarium controls');
     root.innerHTML = `
-      <div id="brand"><h1>Terrarium</h1><span>Your browser garden</span></div>
+      <div id="brand"><h1>Terrasim</h1><span>A browser terrarium</span></div>
       <div id="stats" role="group" aria-label="Terrarium status"></div>
       <div id="alerts" aria-live="polite"></div>
       <div id="toast" role="status"></div>
@@ -285,7 +285,7 @@ export class UI {
       <b>gravel false bottom</b> so excess water drains away from roots, a
       <b>sand barrier</b> that keeps fine soil out of the drainage, and a
       <b>humus-rich topsoil</b> whose capillary pores hold the moisture
-      plants drink. Leaf litter on top is mulch — it slows evaporation and
+      plants drink. Leaf litter on top is mulch. It slows evaporation and
       feeds the cleanup crew as it breaks down.</p>`;
     el.innerHTML = html;
   }
@@ -314,7 +314,7 @@ export class UI {
       which looks darker around the pond.</p>
 
       <h3>\u{1F33F} The plants</h3>
-      <p>Each species drinks at its own pace and grows in real time — a
+      <p>Each species drinks at its own pace and grows in real time. A
       seedling takes a while to mature, so check back on it like a real
       one (or use the 3&times; toggle in the Studio). Thirsty plants turn
       yellow and droop; water them and they recover. Dead ones fall and
@@ -322,14 +322,14 @@ export class UI {
       new sprouts. The Field Guide tab has every species' preferences.</p>
 
       <h3>\u{1F41B} The cleanup crew</h3>
-      <p>Pill-bugs and springtails are decomposers — real keepers add them
+      <p>Pill-bugs and springtails are decomposers. Real keepers add them
       on purpose. They find dead plants and mold and recycle them faster.</p>
 
       <h3>\u{267B}\u{FE0F} Going self-sustaining</h3>
       <p>\u{2022} Keep <b>some standing water</b> so the cycle has a source.<br/>
       \u{2022} Aim for <b>humidity between 55% and 80%</b>.<br/>
       \u{2022} Mix <b>thirsty and hardy species</b> across wet and dry zones.<br/>
-      \u{2022} Let dead plants compost — that's the nutrient loop.<br/>
+      \u{2022} Let dead plants compost. That's the nutrient loop.<br/>
       \u{2022} Watch the mood tag (\u{1F331} = thriving) and the alerts.</p>
 
       <h3>\u{1F5B1}\u{FE0F} Controls</h3>
@@ -377,7 +377,7 @@ export class UI {
     const presetDefs: [PresetName, string, string][] = [
       ['day', '\u{2600}\u{FE0F}', 'Daylight'],
       ['golden', '\u{1F305}', 'Golden hour'],
-      ['night', '\u{1F319}', 'Night — fireflies and glowing fungi'],
+      ['night', '\u{1F319}', 'Night: fireflies and glowing fungi'],
     ];
     for (const [name, icon, label] of presetDefs) {
       const btn = document.createElement('button');
@@ -411,7 +411,7 @@ export class UI {
       speedBtn.setAttribute('aria-label', `Time speed: ${this.speed} times`);
       speedBtn.classList.toggle('active', this.speed > 1);
       this.onSpeed?.(this.speed);
-      this.hint(this.speed > 1 ? 'Time flows faster — watch things grow' : 'Back to normal time', 2500);
+      this.hint(this.speed > 1 ? 'Time flows faster. Watch things grow' : 'Back to normal time', 2500);
     });
     paceRow.appendChild(speedBtn);
 
@@ -505,7 +505,7 @@ export class UI {
     const mood = s.plants === 0 ? '\u{1FAB9}' : s.healthyFrac > 0.8 ? '\u{1F331}' : s.healthyFrac > 0.4 ? '\u{1F614}' : '\u{1F940}';
     this.statsEl.innerHTML =
       `<span title="How long this terrarium has been alive">\u{1F4C5} Day ${day}</span>` +
-      `<span title="Air humidity — high humidity fogs the glass and waters the edges">\u{1F4A7} ${Math.round(s.humidity)}%</span>` +
+      `<span title="Air humidity: high humidity fogs the glass and waters the edges">\u{1F4A7} ${Math.round(s.humidity)}%</span>` +
       `<span title="Standing water">\u{1F30A} ${s.water}</span>` +
       `<span title="Living plants">\u{1F33F} ${s.plants}</span>` +
       `<span title="Ecosystem mood">${mood}</span>`;
@@ -532,7 +532,7 @@ export class UI {
       .join('');
     this.diaryPage.innerHTML = `<h2>\u{1F4D4} Diary</h2>
       <p class="sub">Day ${day} &middot; everything this little world has lived through</p>
-      ${rows || '<p>Nothing yet — the story starts now \u{1F331}</p>'}`;
+      ${rows || '<p>Nothing yet. The story starts now \u{1F331}</p>'}`;
     this.setPage('diary');
   }
 
@@ -558,7 +558,7 @@ export class UI {
   showWelcome(day: number, awayText: string, lines: string[], needsWater: boolean): void {
     const items = lines.map((l) => `<li>${l}</li>`).join('');
     const nudge = needsWater
-      ? `<p><b>Some plants came back thirsty</b> — give them a drink \u{1F4A7}</p>`
+      ? `<p><b>Some plants came back thirsty</b>. Give them a drink \u{1F4A7}</p>`
       : '';
     const el = this.buildOverlay(`
       <h2>\u{1F33F} Welcome back</h2>

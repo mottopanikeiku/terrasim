@@ -39,7 +39,7 @@ function awayLines(s: AwaySummary): string[] {
   if (s.matured > 0) lines.push(n(s.matured, 'A plant reached full size \u{1F33C}', '# plants reached full size \u{1F33C}'));
   if (s.sprouted > 0) lines.push(n(s.sprouted, 'A new seedling sprouted on its own \u{1F331}', '# new seedlings sprouted on their own \u{1F331}'));
   if (s.mossGrown > 3) lines.push('The moss crept a little further \u{1F343}');
-  if (s.pondShrank) lines.push('The pond shrank a touch — the soil drank the difference \u{1F4A7}');
+  if (s.pondShrank) lines.push('The pond shrank a touch. The soil drank the difference \u{1F4A7}');
   if (s.wilted > 0) lines.push(n(s.wilted, 'One plant got thirsty \u{1F940}', '# plants got thirsty \u{1F940}'));
   if (s.died > 0) lines.push(n(s.died, 'A plant withered away \u{1F342}', '# plants withered away \u{1F342}'));
   if (s.composted > 0) lines.push(n(s.composted, 'A dead plant composted into fresh soil \u{267B}\u{FE0F}', '# dead plants composted into fresh soil \u{267B}\u{FE0F}'));
@@ -244,5 +244,5 @@ try {
 } catch (err) {
   console.error('init failed', err);
   const p = document.querySelector('#loading p');
-  if (p) p.textContent = 'WebGL is required — please use a modern browser.';
+  if (p) p.textContent = 'WebGL is required. Please use a modern browser.';
 }

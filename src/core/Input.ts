@@ -182,7 +182,7 @@ export class Input {
 
     if (this.tool === 'moss') {
       if (w.paintMoss(x, z)) {
-        this.onHint?.('Moss settled in — it creeps over damp ground');
+        this.onHint?.('Moss settled in. It creeps over damp ground');
         this.onAction?.();
       } else {
         this.onHint?.('Moss needs a solid surface');
@@ -192,7 +192,7 @@ export class Input {
 
     if (this.tool === 'litter') {
       w.addLitter(x, z);
-      this.onHint?.('Leaf litter scattered — it keeps the soil under it moist');
+      this.onHint?.('Leaf litter scattered. It keeps the soil under it moist');
       this.onAction?.();
       return;
     }
@@ -200,7 +200,7 @@ export class Input {
     const def = SPECIES[this.tool as Species];
     if (!def) return;
     if (w.water[i] > 0.05 && !def.waterEdge) {
-      this.onHint?.('Too deep — plant on dry ground');
+      this.onHint?.('Too deep. Plant on dry ground');
       return;
     }
     const top = w.topMat(i);
@@ -241,7 +241,7 @@ export class Input {
       planted++;
     }
     if (planted > 0) {
-      this.onHint?.('Seeds scattered — keep the soil moist and watch them sprout');
+      this.onHint?.('Seeds scattered. Keep the soil moist and watch them sprout');
       this.onAction?.();
     } else {
       this.onHint?.('Seeds need open soil or sand');
