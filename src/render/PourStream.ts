@@ -1,8 +1,8 @@
 ﻿import * as THREE from 'three';
 
-// Cosmetic pour stream: a sprinkle of falling particles between the
-// cursor and the ground while a pour is held. Pure feedback â€” the volume
-// itself goes straight into the heightfield â€” but it makes pouring FEEL
+// A cosmetic pour stream: particles fall between the cursor and the ground
+// while a pour is held. The poured volume goes straight into the heightfield,
+// so the stream changes nothing in the simulation, but it makes pouring feel
 // like pouring.
 
 const COUNT = 90;
