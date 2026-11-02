@@ -1,6 +1,6 @@
 # Terrasim
 
-A glass tank of soil, water and twelve plant species that runs [in the browser](https://mottopanikeiku.github.io/terrasim/) with Three.js. You pour layers of sand, soil and gravel, dig a pond and plant around it. The plants drink, wilt, recover, die and compost back into the soil. The garden is saved in the browser, and when you come back it fast-forwards through up to three days you were away.
+A terrarium that runs [in the browser](https://mottopanikeiku.github.io/terrasim/) with Three.js: layered soil, water, plants and fungi. Pour a pond, plant around it, and come back later to see what survived.
 
 [![A planted terrarium with layered soil, ferns and a small pond](assets/hero.webp)](https://mottopanikeiku.github.io/terrasim/)
 
@@ -28,7 +28,7 @@ A glass tank of soil, water and twelve plant species that runs [in the browser](
 
 ## How it works
 
-The terrain is a heightfield, so there are no caves or overhangs. [`World.ts`](src/core/World.ts) holds soil, moisture and plant lifecycles, with care rules I tuned by hand. Each plant is a [procedural mesh](src/world/PlantMeshes.ts), and the sound is synthesized in Web Audio.
+The terrain is a heightfield, so there are no caves or overhangs. [`World.ts`](src/core/World.ts) holds soil, moisture and plant lifecycles: plants drink, wilt, recover, die and compost back into the soil, with care rules I tuned by hand. Each plant is a [procedural mesh](src/world/PlantMeshes.ts), and the sound is synthesized in Web Audio. The garden is saved in the browser, and when you come back it fast-forwards through the time you were away, up to three days.
 
 ```sh
 npm ci
