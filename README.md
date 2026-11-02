@@ -1,6 +1,6 @@
 # Terrasim
 
-A terrarium that runs [in the browser](https://mottopanikeiku.github.io/terrasim/) with Three.js: layered soil, water, plants and fungi. Pour a pond, plant around it, and come back later to see what survived.
+Terrasim is a terrarium of layered soil, water, plants and fungi that runs [in the browser](https://mottopanikeiku.github.io/terrasim/) with Three.js. You can pour a pond, plant around it and come back later to see what survived.
 
 [![A planted terrarium with layered soil, ferns and a small pond](assets/hero.webp)](https://mottopanikeiku.github.io/terrasim/)
 
@@ -16,7 +16,7 @@ A terrarium that runs [in the browser](https://mottopanikeiku.github.io/terrasim
 - Seeds, moss, rocks and leaf litter.
 - Water evaporates and fogs the glass.
 - Pillbugs, snails, springtails and butterflies move in uninvited.
-- Night mode brings out fireflies. You can also speed up time or save a photo of the tank.
+- Night mode brings out fireflies, and you can also speed up time or save a photo of the tank.
 
 | Action | Mouse or touch | Keyboard |
 | --- | --- | --- |
@@ -35,6 +35,6 @@ npm ci
 npm run dev
 ```
 
-Needs Node 22 and a browser with WebGL. `npm test` runs the unit tests and `npm run test:browser` the Playwright checks.
+It needs Node 22 and a browser with WebGL, and `npm test` runs the unit tests while `npm run test:browser` runs the Playwright checks.
 
-Built with [Three.js](https://threejs.org/) and [Vite](https://vite.dev/). The interface uses Fraunces and DM Sans from Google Fonts. [MIT license](LICENSE).
+It is built with [Three.js](https://threejs.org/) and [Vite](https://vite.dev/), the interface uses Fraunces and DM Sans from Google Fonts, and the code is under the [MIT license](LICENSE).

@@ -19,7 +19,7 @@ const POUR_TOOLS: ToolDef[] = [
   { id: 'sand', label: 'Sand', icon: '#d6bc8a', hint: 'Hold left mouse to pour sand' },
   { id: 'soil', label: 'Soil', icon: '#5d4734', hint: 'Hold left mouse to pour soil' },
   { id: 'gravel', label: 'Gravel', icon: '#9a948c', hint: 'Hold left mouse to pour gravel' },
-  { id: 'water', label: 'Water', icon: '#6fb3d9', hint: 'Hold left mouse to pour water. Plants drink it from the soil' },
+  { id: 'water', label: 'Water', icon: '#6fb3d9', hint: 'Hold left mouse to pour water, which plants drink from the soil' },
 ];
 
 const PLANT_TOOLS: ToolDef[] = ALL_SPECIES.map((id) => {
@@ -33,7 +33,7 @@ const PLANT_TOOLS: ToolDef[] = ALL_SPECIES.map((id) => {
 });
 
 const EXTRA_TOOLS: ToolDef[] = [
-  { id: 'seeds', label: 'Seeds', icon: '\u{1F33E}', hint: 'Toss a handful of mixed seeds. They sprout on damp soil' },
+  { id: 'seeds', label: 'Seeds', icon: '\u{1F33E}', hint: 'Toss a handful of mixed seeds, which sprout on damp soil' },
   { id: 'moss', label: 'Moss', icon: '\u{1F7E2}', hint: 'Click rocks or soil to spread a moss colony' },
   { id: 'rock', label: 'Rock', icon: '\u{1FAA8}', hint: 'Click to set a rock on the terrain' },
   { id: 'litter', label: 'Litter', icon: '\u{1F342}', hint: 'Scatter fallen leaves as mulch to keep the soil under them damp' },
@@ -43,23 +43,23 @@ const EXTRA_TOOLS: ToolDef[] = [
 const FAUNA_GUIDE: { label: string; sci: string; family: string; icon: string; lore: string }[] = [
   {
     label: 'Common pill-bug', sci: 'Armadillidium vulgare', family: 'Armadillidiidae', icon: '\u{1FAB2}',
-    lore: 'A land crustacean (an isopod), not an insect. It still breathes through gill-like plates, which is why it needs humid air. Rolls into a ball when alarmed ("conglobation") and eats dead plant matter.',
+    lore: 'This land crustacean is an isopod rather than an insect, and it still breathes through gill-like plates, which is why it needs humid air. It rolls into a ball when alarmed ("conglobation") and eats dead plant matter.',
   },
   {
     label: 'Garden snail', sci: 'Cornu aspersum', family: 'Helicidae', icon: '\u{1F40C}',
-    lore: 'Grazes films and tender moss with a radula: a ribbon tongue bearing thousands of microscopic teeth. Seals its shell with dried mucus to wait out dry spells.',
+    lore: 'It grazes films and tender moss with a radula, a ribbon tongue bearing thousands of microscopic teeth, and seals its shell with dried mucus to wait out dry spells.',
   },
   {
     label: 'Springtail', sci: 'Folsomia candida', family: 'Isotomidae', icon: '\u{26AA}',
-    lore: 'A primitive six-legged soil dweller with a spring-loaded tail (furcula) it snaps to launch itself away from danger. The mold patrol of every bioactive terrarium. Watch for tiny pale hops near damp soil.',
+    lore: 'This primitive six-legged soil dweller snaps a spring-loaded tail (furcula) to launch itself away from danger. It is the mold patrol of every bioactive terrarium, so watch for tiny pale hops near damp soil.',
   },
   {
     label: 'Common eastern firefly', sci: 'Photinus pyralis', family: 'Lampyridae', icon: '\u{2728}',
-    lore: 'A beetle, not a fly. Its lantern makes cold light from luciferin at nearly 100% efficiency; males cruise at dusk flashing a J-shaped signal to females in the grass.',
+    lore: 'The firefly is a beetle rather than a fly. Its lantern makes cold light from luciferin at nearly 100% efficiency, and males cruise at dusk flashing a J-shaped signal to females in the grass.',
   },
   {
     label: 'Butterflies', sci: 'Pieris rapae · Polyommatus icarus', family: 'Pieridae / Lycaenidae', icon: '\u{1F98B}',
-    lore: 'Day-fliers that taste with their feet and drink nectar through a coiled proboscis. At night they do not sleep so much as roost: wings folded, metabolism low, waiting for the sun.',
+    lore: 'These day-fliers taste with their feet and drink nectar through a coiled proboscis. At night they do not sleep so much as roost, with wings folded and metabolism low, waiting for the sun.',
   },
 ];
 
@@ -411,7 +411,7 @@ export class UI {
       speedBtn.setAttribute('aria-label', `Time speed: ${this.speed} times`);
       speedBtn.classList.toggle('active', this.speed > 1);
       this.onSpeed?.(this.speed);
-      this.hint(this.speed > 1 ? 'Time flows faster. Watch things grow' : 'Back to normal time', 2500);
+      this.hint(this.speed > 1 ? 'Time flows faster, so watch things grow' : 'Back to normal time', 2500);
     });
     paceRow.appendChild(speedBtn);
 
@@ -532,7 +532,7 @@ export class UI {
       .join('');
     this.diaryPage.innerHTML = `<h2>\u{1F4D4} Diary</h2>
       <p class="sub">Day ${day} &middot; everything this little world has lived through</p>
-      ${rows || '<p>Nothing yet. The story starts now \u{1F331}</p>'}`;
+      ${rows || '<p>Nothing has happened yet, but the story starts now \u{1F331}</p>'}`;
     this.setPage('diary');
   }
 
